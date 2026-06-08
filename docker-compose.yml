@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zhiyu}
+      POSTGRES_USER: ${POSTGRES_USER:-zhiyu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zhiyu_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://zhiyu:zhiyu_password@postgres:5432/zhiyu}
+      DATABASE_PATH: /data/zhiyu.db
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3001,http://127.0.0.1:3001,http://localhost:8080,http://127.0.0.1:8080}
+      HUNYUAN_API_KEY: ${HUNYUAN_API_KEY:-}
+      HUNYUAN_BASE_URL: ${HUNYUAN_BASE_URL:-https://api.hunyuan.cloud.tencent.com/v1}
+      HUNYUAN_MODEL: ${HUNYUAN_MODEL:-hunyuan-lite}
+      DIFY_API_URL: ${DIFY_API_URL:-}
+      DIFY_API_KEY: ${DIFY_API_KEY:-}
+      DIFY_DATASET_ID: ${DIFY_DATASET_ID:-}
+      USE_DIFY_RETRIEVAL: ${USE_DIFY_RETRIEVAL:-false}
+      RAGFLOW_API_URL: ${RAGFLOW_API_URL:-}
+      RAGFLOW_API_KEY: ${RAGFLOW_API_KEY:-}
+      RAGFLOW_KB_ID: ${RAGFLOW_KB_ID:-}
+      USE_RAGFLOW_RETRIEVAL: ${USE_RAGFLOW_RETRIEVAL:-false}
+    ports:
+      - "8000:8000"
+    volumes:
+      - zhiyu-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "3001:3001"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    profiles:
+      - proxy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres-data:
+  zhiyu-data:
+  caddy-data:
+  caddy-config:
