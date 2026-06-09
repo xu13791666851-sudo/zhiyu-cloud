@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
-from os import environ
-from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import requests
 import uvicorn
@@ -18,12 +14,11 @@ from pydantic import BaseModel
 from api import retrieve
 from config import (
     ALLOWED_ORIGINS,
-    DATABASE_PATH,
-    DATABASE_URL,
     HUNYUAN_API_KEY,
     HUNYUAN_BASE_URL,
     HUNYUAN_MODEL,
 )
+from db import connect_db, ensure_default_session, init_db, insert_message, placeholder, using_postgres
 
 
 app = FastAPI(title="ZhiYu API")
@@ -47,81 +42,6 @@ class ChatRequest(BaseModel):
     history: Optional[list[dict[str, Any]]] = None
     top_k: int = 5
     session_id: Optional[str] = "default"
-
-
-def using_postgres() -> bool:
-    return DATABASE_URL.startswith(("postgres://", "postgresql://"))
-
-
-def normalized_database_url() -> str:
-    if not DATABASE_URL:
-        return DATABASE_URL
-
-    parsed = urlparse(DATABASE_URL)
-    if not parsed.hostname or not parsed.hostname.endswith(".supabase.co"):
-        return DATABASE_URL
-
-    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
-    query.setdefault("sslmode", "require")
-    return urlunparse(parsed._replace(query=urlencode(query)))
-
-
-def connect_db():
-    if using_postgres():
-        import psycopg
-
-        try:
-            return psycopg.connect(
-                normalized_database_url(),
-                connect_timeout=int(environ.get("DATABASE_CONNECT_TIMEOUT", "10")),
-                prepare_threshold=None,
-            )
-        except psycopg.OperationalError as exc:
-            if "Network is unreachable" in str(exc) and "supabase.co" in DATABASE_URL:
-                raise RuntimeError(
-                    "Supabase direct database URLs are IPv6-only on the free plan. "
-                    "Use the Supabase shared pooler URL instead, for example "
-                    "postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:5432/postgres?sslmode=require"
-                ) from exc
-            raise
-
-    db_path = Path(DATABASE_PATH)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(db_path, check_same_thread=False)
-
-
-def placeholder() -> str:
-    return "%s" if using_postgres() else "?"
-
-
-def init_db() -> None:
-    conn = connect_db()
-    try:
-        if using_postgres():
-            conn.execute(
-                """CREATE TABLE IF NOT EXISTS conversations (
-                    id SERIAL PRIMARY KEY,
-                    session_id TEXT,
-                    role TEXT,
-                    content TEXT,
-                    sources TEXT,
-                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-                )"""
-            )
-        else:
-            conn.execute(
-                """CREATE TABLE IF NOT EXISTS conversations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT,
-                    role TEXT,
-                    content TEXT,
-                    sources TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                )"""
-            )
-        conn.commit()
-    finally:
-        conn.close()
 
 
 init_db()
@@ -199,6 +119,8 @@ def save_message(session_id: str, role: str, content: str, sources: str) -> None
         f"VALUES ({mark}, {mark}, {mark}, {mark})",
         (session_id, role, content, sources),
     )
+    structured_session_id = ensure_default_session(db_conn, session_id)
+    insert_message(db_conn, structured_session_id, role, content, sources)
     db_conn.commit()
 
 
