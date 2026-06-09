@@ -30,41 +30,48 @@ def _load_dotenv(path: Path = ENV_PATH) -> None:
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
-    value = os.environ.get(name)
+    value = _env(name)
     if value is None:
         return default
     return value.lower() in {"1", "true", "yes", "on"}
 
 
 def _env_list(name: str, default: str = "") -> list[str]:
-    value = os.environ.get(name, default)
+    value = _env(name, default) or ""
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _env(name: str, default: str | None = None) -> str | None:
+    value = os.environ.get(name, default)
+    if value is None:
+        return None
+    return value.strip().strip('"').strip("'")
 
 
 _load_dotenv()
 
 
 # LLM
-HUNYUAN_API_KEY = os.environ.get("HUNYUAN_API_KEY", "")
-HUNYUAN_BASE_URL = os.environ.get(
+HUNYUAN_API_KEY = _env("HUNYUAN_API_KEY", "") or ""
+HUNYUAN_BASE_URL = _env(
     "HUNYUAN_BASE_URL",
     "https://api.hunyuan.cloud.tencent.com/v1",
-)
-HUNYUAN_MODEL = os.environ.get("HUNYUAN_MODEL", "hunyuan-lite")
+) or "https://api.hunyuan.cloud.tencent.com/v1"
+HUNYUAN_MODEL = _env("HUNYUAN_MODEL", "hunyuan-lite") or "hunyuan-lite"
 
 
 # Retrieval providers
-RAGFLOW_API_URL = os.environ.get("RAGFLOW_API_URL", "")
-RAGFLOW_API_KEY = os.environ.get("RAGFLOW_API_KEY", "")
-RAGFLOW_KB_ID = os.environ.get("RAGFLOW_KB_ID", "")
+RAGFLOW_API_URL = _env("RAGFLOW_API_URL", "") or ""
+RAGFLOW_API_KEY = _env("RAGFLOW_API_KEY", "") or ""
+RAGFLOW_KB_ID = _env("RAGFLOW_KB_ID", "") or ""
 USE_RAGFLOW_RETRIEVAL = _env_bool(
     "USE_RAGFLOW_RETRIEVAL",
     bool(RAGFLOW_API_URL and RAGFLOW_API_KEY and RAGFLOW_KB_ID),
 )
 
-DIFY_API_URL = os.environ.get("DIFY_API_URL", "")
-DIFY_API_KEY = os.environ.get("DIFY_API_KEY", "")
-DIFY_DATASET_ID = os.environ.get("DIFY_DATASET_ID", "")
+DIFY_API_URL = _env("DIFY_API_URL", "") or ""
+DIFY_API_KEY = _env("DIFY_API_KEY", "") or ""
+DIFY_DATASET_ID = _env("DIFY_DATASET_ID", "") or ""
 USE_DIFY_RETRIEVAL = _env_bool(
     "USE_DIFY_RETRIEVAL",
     bool(DIFY_API_URL and DIFY_API_KEY and DIFY_DATASET_ID),
@@ -76,8 +83,8 @@ ALLOWED_ORIGINS = _env_list(
     "ALLOWED_ORIGINS",
     "http://localhost:3001,http://127.0.0.1:3001",
 )
-DATABASE_PATH = os.environ.get("DATABASE_PATH", str(BASE_DIR / "zhiyu.db"))
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+DATABASE_PATH = _env("DATABASE_PATH", str(BASE_DIR / "zhiyu.db")) or str(BASE_DIR / "zhiyu.db")
+DATABASE_URL = _env("DATABASE_URL", "") or ""
 
 
 def load_knowledge_base() -> list[dict]:

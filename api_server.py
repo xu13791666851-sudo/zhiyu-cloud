@@ -169,13 +169,14 @@ User question:
 
 
 def chat_with_hunyuan(prompt: str) -> str:
-    if not HUNYUAN_API_KEY:
+    api_key = HUNYUAN_API_KEY.strip()
+    if not api_key:
         return "LLM is not configured. Please set HUNYUAN_API_KEY in .env."
 
     try:
         url = f"{HUNYUAN_BASE_URL.rstrip('/')}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {HUNYUAN_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         payload = {
