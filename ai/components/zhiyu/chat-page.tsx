@@ -1,3 +1,203 @@
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FileText,
+  Send,
+  Trash2,
+} from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+
+interface Source {
+  id: string
+  title: string
+  author: string
+  year: string
+  page: string
+  excerpt: string
+  credibility: "high" | "medium" | "low"
+  type: string
+}
+
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  sources?: Source[]
+}
+
+interface ApiChunk {
+  content: string
+  doc?: string
+  credibility?: "high" | "medium" | "low"
+  page_start?: number | null
+  page_end?: number | null
+  source_type?: string | null
+  section_title?: string | null
+}
+
+const credibilityConfig = {
+  high: {
+    label: "高可信度",
+    icon: CheckCircle2,
+    className: "bg-green-500/10 text-green-400 border-green-500/20",
+  },
+  medium: {
+    label: "中可信度",
+    icon: AlertTriangle,
+    className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  },
+  low: {
+    label: "低可信度",
+    icon: AlertCircle,
+    className: "bg-red-500/10 text-red-400 border-red-500/20",
+  },
+}
+
+const initialMessages: Message[] = [
+  {
+    id: "welcome",
+    role: "assistant",
+    content:
+      "你好，我是知域 AI 文献助手。现在我会优先从你新上传并解析成功的文献中检索内容，并附上来源片段。",
+  },
+]
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
+
+function formatChunkPage(chunk: ApiChunk) {
+  if (!chunk.page_start) return ""
+  if (!chunk.page_end || chunk.page_end === chunk.page_start) {
+    return `p. ${chunk.page_start}`
+  }
+  return `pp. ${chunk.page_start}-${chunk.page_end}`
+}
+
+function toSource(chunk: ApiChunk, index: number): Source {
+  const sectionSuffix = chunk.section_title ? ` / ${chunk.section_title}` : ""
+  return {
+    id: `src-${index}`,
+    title: `${chunk.doc || "未知来源"}${sectionSuffix}`,
+    author: "",
+    year: "",
+    page: formatChunkPage(chunk),
+    excerpt: chunk.content?.slice(0, 140) || "",
+    credibility: chunk.credibility || "medium",
+    type: chunk.source_type || "",
+  }
+}
+
+function SourceCard({
+  source,
+  isExpanded,
+  onToggle,
+}: {
+  source: Source
+  isExpanded: boolean
+  onToggle: () => void
+}) {
+  const config = credibilityConfig[source.credibility]
+  const Icon = config.icon
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/50 bg-secondary/30">
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-2 p-3 text-left transition-colors hover:bg-secondary/50"
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <FileText className="h-4 w-4 shrink-0 text-primary" />
+          <span className="truncate text-sm font-medium text-foreground">{source.title}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant="outline" className={cn("text-xs", config.className)}>
+            <Icon className="mr-1 h-3 w-3" />
+            {config.label}
+          </Badge>
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+      {isExpanded && (
+        <div className="space-y-2 border-t border-border/50 p-3">
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            {source.author && <span>作者: {source.author}</span>}
+            {source.page && <span>{source.page}</span>}
+            {source.type && <span>{source.type}</span>}
+          </div>
+          <div className="rounded bg-secondary/50 p-2 text-xs italic text-foreground/80">
+            "{source.excerpt}"
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set())
+
+  const toggleSource = (sourceId: string) => {
+    setExpandedSources((prev) => {
+      const next = new Set(prev)
+      if (next.has(sourceId)) {
+        next.delete(sourceId)
+      } else {
+        next.add(sourceId)
+      }
+      return next
+    })
+  }
+
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-primary-foreground">
+          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[90%] space-y-3">
+        <div className="rounded-2xl rounded-tl-md border border-border/50 bg-[#353535] px-4 py-3">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {message.content}
+          </p>
+        </div>
+
+        {message.sources && message.sources.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              参考来源 ({message.sources.length})
+            </p>
+            {message.sources.map((source) => (
+              <SourceCard
+                key={source.id}
+                source={source}
+                isExpanded={expandedSources.has(source.id)}
+                onToggle={() => toggleSource(source.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
