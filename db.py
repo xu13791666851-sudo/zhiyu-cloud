@@ -79,7 +79,7 @@ def create_indexes(conn) -> None:
             "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)",
             "CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)",
             "CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status)",
-            "CREATE INDEX IF NOT EXISTS idx_document_chunks_doc_id ON document_chunks(doc_id)",
+            "CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id ON document_chunks(document_id)",
             "CREATE INDEX IF NOT EXISTS idx_retrieval_logs_session_id ON retrieval_logs(session_id)",
         ],
     )
