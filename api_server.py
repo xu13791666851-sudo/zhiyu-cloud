@@ -7,11 +7,10 @@ from typing import Any, Optional
 
 import requests
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from api import retrieve
 from config import (
     ALLOWED_ORIGINS,
     HUNYUAN_API_KEY,
@@ -46,6 +45,8 @@ class ChatRequest(BaseModel):
 
 init_db()
 db_conn = connect_db()
+_retrieve_fn = None
+_retrieve_import_error: Exception | None = None
 
 
 def calc_credibility(similarity: float) -> str:
@@ -69,6 +70,33 @@ def format_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return formatted
+
+
+def get_retrieve():
+    global _retrieve_fn, _retrieve_import_error
+
+    if _retrieve_fn is not None:
+        return _retrieve_fn
+    if _retrieve_import_error is not None:
+        raise RuntimeError("Retrieval backend is unavailable") from _retrieve_import_error
+
+    try:
+        from api import retrieve as retrieve_fn
+    except Exception as exc:
+        _retrieve_import_error = exc
+        print(f"[retrieve] import failed: {exc}")
+        raise RuntimeError("Retrieval backend is unavailable") from exc
+
+    _retrieve_fn = retrieve_fn
+    return _retrieve_fn
+
+
+def run_retrieval(query: str, top_k: int) -> list[dict[str, Any]]:
+    try:
+        retrieve = get_retrieve()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return retrieve(query, top_k)
 
 
 def build_prompt(query: str, chunks: list[dict[str, Any]]) -> str:
@@ -126,13 +154,13 @@ def save_message(session_id: str, role: str, content: str, sources: str) -> None
 
 @app.post("/api/retrieve")
 def api_retrieve(req: RetrieveRequest):
-    chunks = retrieve(req.query, req.top_k)
+    chunks = run_retrieval(req.query, req.top_k)
     return {"chunks": format_chunks(chunks)}
 
 
 @app.post("/api/chat")
 def api_chat(req: ChatRequest):
-    chunks = retrieve(req.query, req.top_k)
+    chunks = run_retrieval(req.query, req.top_k)
 
     if chunks:
         prompt = build_prompt(req.query, chunks)
