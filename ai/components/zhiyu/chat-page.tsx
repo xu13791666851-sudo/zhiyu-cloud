@@ -49,17 +49,17 @@ interface ApiChunk {
 
 const credibilityConfig = {
   high: {
-    label: "高可信度",
+    label: "楂樺彲淇″害",
     icon: CheckCircle2,
     className: "bg-green-500/10 text-green-400 border-green-500/20",
   },
   medium: {
-    label: "中可信度",
+    label: "涓彲淇″害",
     icon: AlertTriangle,
     className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   },
   low: {
-    label: "低可信度",
+    label: "浣庡彲淇″害",
     icon: AlertCircle,
     className: "bg-red-500/10 text-red-400 border-red-500/20",
   },
@@ -70,7 +70,7 @@ const initialMessages: Message[] = [
     id: "welcome",
     role: "assistant",
     content:
-      "你好，我是知域 AI 文献助手。现在我会优先从你新上传并解析成功的文献中检索内容，并附上来源片段。",
+      "浣犲ソ锛屾垜鏄煡鍩?AI 鏂囩尞鍔╂墜銆傜幇鍦ㄦ垜浼氫紭鍏堜粠浣犳柊涓婁紶骞惰В鏋愭垚鍔熺殑鏂囩尞涓绱㈠唴瀹癸紝骞堕檮涓婃潵婧愮墖娈点€?,
   },
 ]
 
@@ -88,7 +88,7 @@ function toSource(chunk: ApiChunk, index: number): Source {
   const sectionSuffix = chunk.section_title ? ` / ${chunk.section_title}` : ""
   return {
     id: `src-${index}`,
-    title: `${chunk.doc || "未知来源"}${sectionSuffix}`,
+    title: `${chunk.doc || "鏈煡鏉ユ簮"}${sectionSuffix}`,
     author: "",
     year: "",
     page: formatChunkPage(chunk),
@@ -135,7 +135,7 @@ function SourceCard({
       {isExpanded && (
         <div className="space-y-2 border-t border-border/50 p-3">
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            {source.author && <span>作者: {source.author}</span>}
+            {source.author && <span>浣滆€? {source.author}</span>}
             {source.page && <span>{source.page}</span>}
             {source.type && <span>{source.type}</span>}
           </div>
@@ -185,7 +185,7 @@ function MessageBubble({ message }: { message: Message }) {
         {message.sources && message.sources.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
-              参考来源 ({message.sources.length})
+              鍙傝€冩潵婧?({message.sources.length})
             </p>
             {message.sources.map((source) => (
               <SourceCard
@@ -228,7 +228,7 @@ export default function ChatPage() {
           setMessages((prev) => [...prev, ...historyMessages])
         }
       })
-      .catch((err) => console.error("获取历史记录失败:", err))
+      .catch((err) => console.error("鑾峰彇鍘嗗彶璁板綍澶辫触:", err))
   }, [sessionId])
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -257,25 +257,25 @@ export default function ChatPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data?.detail || "后端服务调用失败")
+        throw new Error(data?.detail || "鍚庣鏈嶅姟璋冪敤澶辫触")
       }
 
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content: data.answer || "暂无回答",
+        content: data.answer || "鏆傛棤鍥炵瓟",
         sources: (data.chunks || []).map((chunk: ApiChunk, index: number) => toSource(chunk, index)),
       }
 
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "后端服务调用失败"
+      const errorMessage = err instanceof Error ? err.message : "鍚庣鏈嶅姟璋冪敤澶辫触"
       setMessages((prev) => [
         ...prev,
         {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: `⚠️ ${errorMessage}`,
+          content: `鈿狅笍 ${errorMessage}`,
         },
       ])
     } finally {
@@ -289,13 +289,13 @@ export default function ChatPage() {
 
   const handleExport = () => {
     const content = messages
-      .map((message) => `[${message.role === "user" ? "用户" : "知域"}]\n${message.content}`)
+      .map((message) => `[${message.role === "user" ? "鐢ㄦ埛" : "鐭ュ煙"}]\n${message.content}`)
       .join("\n\n---\n\n")
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = `知域对话记录_${new Date().toLocaleDateString()}.txt`
+    link.download = `鐭ュ煙瀵硅瘽璁板綍_${new Date().toLocaleDateString()}.txt`
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -312,13 +312,13 @@ export default function ChatPage() {
       <header className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="flex h-14 items-center justify-between px-4">
           <div>
-            <h1 className="text-sm font-semibold text-foreground">智能问答</h1>
-            <p className="text-xs text-muted-foreground">基于知识库与新上传文献的真实问答。</p>
+            <h1 className="text-sm font-semibold text-foreground">鏅鸿兘闂瓟</h1>
+            <p className="text-xs text-muted-foreground">鍩轰簬鐭ヨ瘑搴撲笌鏂颁笂浼犳枃鐚殑鐪熷疄闂瓟銆?/p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={handleExport} className="h-8 gap-1 text-xs">
               <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">导出</span>
+              <span className="hidden sm:inline">瀵煎嚭</span>
             </Button>
             <Button
               variant="ghost"
@@ -327,7 +327,7 @@ export default function ChatPage() {
               className="h-8 gap-1 text-xs text-destructive hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">清空</span>
+              <span className="hidden sm:inline">娓呯┖</span>
             </Button>
           </div>
         </div>
@@ -344,7 +344,7 @@ export default function ChatPage() {
                 <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
                 <div className="delay-150 h-2 w-2 animate-pulse rounded-full bg-primary" />
                 <div className="delay-300 h-2 w-2 animate-pulse rounded-full bg-primary" />
-                <span className="ml-2 text-xs text-muted-foreground">正在检索与生成回答...</span>
+                <span className="ml-2 text-xs text-muted-foreground">姝ｅ湪妫€绱笌鐢熸垚鍥炵瓟...</span>
               </div>
             </div>
           </div>
@@ -360,7 +360,7 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="输入你的问题..."
+              placeholder="杈撳叆浣犵殑闂..."
               className="min-h-[44px] max-h-32 resize-none border-border/50 bg-secondary/50 focus:border-primary"
               rows={1}
             />
@@ -368,7 +368,7 @@ export default function ChatPage() {
               <Send className="h-4 w-4" />
             </Button>
           </div>
-          <p className="mt-2 text-center text-xs text-muted-foreground">按 Enter 发送，Shift + Enter 换行</p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">鎸?Enter 鍙戦€侊紝Shift + Enter 鎹㈣</p>
         </form>
       </div>
     </div>
