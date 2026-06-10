@@ -49,17 +49,17 @@ interface ApiChunk {
 
 const credibilityConfig = {
   high: {
-    label: "楂樺彲淇″害",
+    label: "High confidence",
     icon: CheckCircle2,
     className: "bg-green-500/10 text-green-400 border-green-500/20",
   },
   medium: {
-    label: "涓彲淇″害",
+    label: "Medium confidence",
     icon: AlertTriangle,
     className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   },
   low: {
-    label: "浣庡彲淇″害",
+    label: "Low confidence",
     icon: AlertCircle,
     className: "bg-red-500/10 text-red-400 border-red-500/20",
   },
@@ -70,7 +70,7 @@ const initialMessages: Message[] = [
     id: "welcome",
     role: "assistant",
     content:
-      "浣犲ソ锛屾垜鏄煡鍩?AI 鏂囩尞鍔╂墜銆傜幇鍦ㄦ垜浼氫紭鍏堜粠浣犳柊涓婁紶骞惰В鏋愭垚鍔熺殑鏂囩尞涓绱㈠唴瀹癸紝骞堕檮涓婃潵婧愮墖娈点€?,
+      "Hi, I am ZhiYu, your literature assistant. I will search uploaded and parsed documents first, then attach the source passages.",
   },
 ]
 
@@ -88,7 +88,7 @@ function toSource(chunk: ApiChunk, index: number): Source {
   const sectionSuffix = chunk.section_title ? ` / ${chunk.section_title}` : ""
   return {
     id: `src-${index}`,
-    title: `${chunk.doc || "鏈煡鏉ユ簮"}${sectionSuffix}`,
+    title: `${chunk.doc || "Unknown source"}${sectionSuffix}`,
     author: "",
     year: "",
     page: formatChunkPage(chunk),
@@ -135,7 +135,7 @@ function SourceCard({
       {isExpanded && (
         <div className="space-y-2 border-t border-border/50 p-3">
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            {source.author && <span>浣滆€? {source.author}</span>}
+            {source.author && <span>Author: {source.author}</span>}
             {source.page && <span>{source.page}</span>}
             {source.type && <span>{source.type}</span>}
           </div>
@@ -185,7 +185,7 @@ function MessageBubble({ message }: { message: Message }) {
         {message.sources && message.sources.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
-              鍙傝€冩潵婧?({message.sources.length})
+              Sources ({message.sources.length})
             </p>
             {message.sources.map((source) => (
               <SourceCard
@@ -228,7 +228,7 @@ export default function ChatPage() {
           setMessages((prev) => [...prev, ...historyMessages])
         }
       })
-      .catch((err) => console.error("鑾峰彇鍘嗗彶璁板綍澶辫触:", err))
+      .catch((err) => console.error("Failed to load chat history:", err))
   }, [sessionId])
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -257,25 +257,25 @@ export default function ChatPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data?.detail || "鍚庣鏈嶅姟璋冪敤澶辫触")
+        throw new Error(data?.detail || "Backend request failed")
       }
 
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content: data.answer || "鏆傛棤鍥炵瓟",
+        content: data.answer || "No answer yet.",
         sources: (data.chunks || []).map((chunk: ApiChunk, index: number) => toSource(chunk, index)),
       }
 
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "鍚庣鏈嶅姟璋冪敤澶辫触"
+      const errorMessage = err instanceof Error ? err.message : "Backend request failed"
       setMessages((prev) => [
         ...prev,
         {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: `鈿狅笍 ${errorMessage}`,
+          content: `Warning: ${errorMessage}`,
         },
       ])
     } finally {
@@ -289,13 +289,13 @@ export default function ChatPage() {
 
   const handleExport = () => {
     const content = messages
-      .map((message) => `[${message.role === "user" ? "鐢ㄦ埛" : "鐭ュ煙"}]\n${message.content}`)
+      .map((message) => `[${message.role === "user" ? "User" : "ZhiYu"}]\n${message.content}`)
       .join("\n\n---\n\n")
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = `鐭ュ煙瀵硅瘽璁板綍_${new Date().toLocaleDateString()}.txt`
+    link.download = `zhiyu-chat-history_${new Date().toLocaleDateString()}.txt`
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -312,13 +312,13 @@ export default function ChatPage() {
       <header className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="flex h-14 items-center justify-between px-4">
           <div>
-            <h1 className="text-sm font-semibold text-foreground">鏅鸿兘闂瓟</h1>
-            <p className="text-xs text-muted-foreground">鍩轰簬鐭ヨ瘑搴撲笌鏂颁笂浼犳枃鐚殑鐪熷疄闂瓟銆?/p>
+            <h1 className="text-sm font-semibold text-foreground">Chat</h1>
+            <p className="text-xs text-muted-foreground">Ask across the knowledge base and newly uploaded documents.</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={handleExport} className="h-8 gap-1 text-xs">
               <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">瀵煎嚭</span>
+              <span className="hidden sm:inline">Export</span>
             </Button>
             <Button
               variant="ghost"
@@ -327,7 +327,7 @@ export default function ChatPage() {
               className="h-8 gap-1 text-xs text-destructive hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">娓呯┖</span>
+              <span className="hidden sm:inline">Clear</span>
             </Button>
           </div>
         </div>
@@ -344,7 +344,7 @@ export default function ChatPage() {
                 <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
                 <div className="delay-150 h-2 w-2 animate-pulse rounded-full bg-primary" />
                 <div className="delay-300 h-2 w-2 animate-pulse rounded-full bg-primary" />
-                <span className="ml-2 text-xs text-muted-foreground">姝ｅ湪妫€绱笌鐢熸垚鍥炵瓟...</span>
+                <span className="ml-2 text-xs text-muted-foreground">Retrieving and generating...</span>
               </div>
             </div>
           </div>
@@ -360,7 +360,7 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="杈撳叆浣犵殑闂..."
+              placeholder="Ask a question..."
               className="min-h-[44px] max-h-32 resize-none border-border/50 bg-secondary/50 focus:border-primary"
               rows={1}
             />
@@ -368,7 +368,7 @@ export default function ChatPage() {
               <Send className="h-4 w-4" />
             </Button>
           </div>
-          <p className="mt-2 text-center text-xs text-muted-foreground">鎸?Enter 鍙戦€侊紝Shift + Enter 鎹㈣</p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">Press Enter to send, Shift + Enter for a new line</p>
         </form>
       </div>
     </div>
