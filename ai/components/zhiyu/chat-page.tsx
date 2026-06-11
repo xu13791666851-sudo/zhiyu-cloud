@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import {
   AlertCircle,
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -125,12 +126,9 @@ function toSource(chunk: ApiChunk, index: number): Source {
       chunk.document_id !== undefined ? `Document ${chunk.document_id}` : "Unknown source",
     ) || "Unknown source"
   const sectionTitle = cleanCitationText(chunk.section_title)
-  const sectionSuffix = sectionTitle && !docTitle.includes(sectionTitle)
-    ? ` / ${sectionTitle}`
-    : ""
   return {
     id: `src-${index}`,
-    title: `${docTitle}${sectionSuffix}`,
+    title: docTitle,
     author: "",
     year: "",
     page: formatChunkPage(chunk),
@@ -216,22 +214,15 @@ function EvidenceCard({
               {source.title}
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {source.provider && (
-                <Badge variant="outline" className="h-5 border-cyan-500/20 bg-cyan-500/10 px-1.5 text-[10px] text-cyan-300">
-                  <Database className="mr-1 h-3 w-3" />
-                  {source.provider}
-                </Badge>
-              )}
-              {source.embeddingModel && (
-                <Badge variant="outline" className="h-5 border-primary/20 bg-primary/10 px-1.5 text-[10px] text-primary">
-                  <Sparkles className="mr-1 h-3 w-3" />
-                  {source.embeddingModel}
-                </Badge>
-              )}
-              {source.chunkIndex !== undefined && (
+              {source.page && (
                 <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
-                  <Layers3 className="mr-1 h-3 w-3" />
-                  chunk {source.chunkIndex}
+                  <BookOpen className="mr-1 h-3 w-3" />
+                  {source.page}
+                </Badge>
+              )}
+              {source.sectionTitle && (
+                <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
+                  {source.sectionTitle}
                 </Badge>
               )}
             </div>
@@ -251,22 +242,63 @@ function EvidenceCard({
       </button>
       {isExpanded && (
         <div className="space-y-3 border-t border-border/50 p-3">
-          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            {source.author && <span>Author: {source.author}</span>}
-            {source.documentId !== undefined && <span>doc {source.documentId}</span>}
-            {source.chunkIndex !== undefined && <span>chunk {source.chunkIndex}</span>}
-            {source.page && <span>{source.page}</span>}
-            {source.type && <span>{source.type}</span>}
-            {source.keywordScore !== undefined && <span>keyword {formatRawScore(source.keywordScore)}</span>}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium uppercase text-muted-foreground">
+              Original passage
+            </div>
+            <div className="rounded-md border border-border/40 bg-background/40 p-2.5 text-xs leading-relaxed text-foreground/80">
+              "{source.excerpt}"
+            </div>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <ScoreBar label="rerank" value={source.rerankScore} />
-            <ScoreBar label="embedding" value={source.embeddingScore} />
-            <ScoreBar label="coverage" value={source.coverageScore} />
-          </div>
-          <div className="rounded-md border border-border/40 bg-background/40 p-2.5 text-xs leading-relaxed text-foreground/80">
-            "{source.excerpt}"
-          </div>
+          <details className="group rounded-md border border-border/40 bg-background/30">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+              <span>Details / debug info</span>
+              <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3 border-t border-border/40 p-2.5">
+              <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+                {source.author && <span>Author: {source.author}</span>}
+                {source.documentId !== undefined && (
+                  <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
+                    doc {source.documentId}
+                  </Badge>
+                )}
+                {source.chunkIndex !== undefined && (
+                  <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
+                    <Layers3 className="mr-1 h-3 w-3" />
+                    chunk {source.chunkIndex}
+                  </Badge>
+                )}
+                {source.type && (
+                  <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
+                    {source.type}
+                  </Badge>
+                )}
+                {source.provider && (
+                  <Badge variant="outline" className="h-5 border-cyan-500/20 bg-cyan-500/10 px-1.5 text-[10px] text-cyan-300">
+                    <Database className="mr-1 h-3 w-3" />
+                    {source.provider}
+                  </Badge>
+                )}
+                {source.embeddingModel && (
+                  <Badge variant="outline" className="h-5 border-primary/20 bg-primary/10 px-1.5 text-[10px] text-primary">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    {source.embeddingModel}
+                  </Badge>
+                )}
+                {source.keywordScore !== undefined && (
+                  <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
+                    keyword {formatRawScore(source.keywordScore)}
+                  </Badge>
+                )}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <ScoreBar label="rerank" value={source.rerankScore} />
+                <ScoreBar label="embedding" value={source.embeddingScore} />
+                <ScoreBar label="coverage" value={source.coverageScore} />
+              </div>
+            </div>
+          </details>
         </div>
       )}
     </div>
