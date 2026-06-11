@@ -94,6 +94,22 @@ const initialMessages: Message[] = [
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 
+function looksMojibake(value?: string | null) {
+  const text = (value || "").trim()
+  if (!text) return false
+  const markerHits = (text.match(/[\u00c0-\u00ff]/g) || []).length
+  const cjkHits = (text.match(/[\u4e00-\u9fff]/g) || []).length
+  const replacementHits = (text.match(/\ufffd/g) || []).length
+  return replacementHits > 0 || (markerHits >= 2 && cjkHits < 4)
+}
+
+function cleanCitationText(value?: string | null, fallback?: string) {
+  const text = (value || "").trim()
+  if (text && !looksMojibake(text)) return text
+  if (fallback && !looksMojibake(fallback)) return fallback
+  return undefined
+}
+
 function formatChunkPage(chunk: ApiChunk) {
   if (!chunk.page_start) return ""
   if (!chunk.page_end || chunk.page_end === chunk.page_start) {
@@ -103,12 +119,18 @@ function formatChunkPage(chunk: ApiChunk) {
 }
 
 function toSource(chunk: ApiChunk, index: number): Source {
-  const sectionSuffix = chunk.section_title && !chunk.doc?.includes(chunk.section_title)
-    ? ` / ${chunk.section_title}`
+  const docTitle =
+    cleanCitationText(
+      chunk.doc,
+      chunk.document_id !== undefined ? `Document ${chunk.document_id}` : "Unknown source",
+    ) || "Unknown source"
+  const sectionTitle = cleanCitationText(chunk.section_title)
+  const sectionSuffix = sectionTitle && !docTitle.includes(sectionTitle)
+    ? ` / ${sectionTitle}`
     : ""
   return {
     id: `src-${index}`,
-    title: `${chunk.doc || "Unknown source"}${sectionSuffix}`,
+    title: `${docTitle}${sectionSuffix}`,
     author: "",
     year: "",
     page: formatChunkPage(chunk),
@@ -123,12 +145,18 @@ function toSource(chunk: ApiChunk, index: number): Source {
     keywordScore: chunk.keyword_score ?? undefined,
     rerankScore: chunk.rerank_score ?? undefined,
     coverageScore: chunk.coverage_score ?? undefined,
-    sectionTitle: chunk.section_title || undefined,
+    sectionTitle,
   }
 }
 
 function formatScore(value?: number) {
   if (typeof value !== "number" || Number.isNaN(value)) return "--"
+  return value.toFixed(3)
+}
+
+function formatRawScore(value?: number) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "--"
+  if (value >= 100) return value.toFixed(0)
   return value.toFixed(3)
 }
 
@@ -226,12 +254,15 @@ function EvidenceCard({
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             {source.author && <span>Author: {source.author}</span>}
             {source.documentId !== undefined && <span>doc {source.documentId}</span>}
+            {source.chunkIndex !== undefined && <span>chunk {source.chunkIndex}</span>}
             {source.page && <span>{source.page}</span>}
             {source.type && <span>{source.type}</span>}
+            {source.keywordScore !== undefined && <span>keyword {formatRawScore(source.keywordScore)}</span>}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <ScoreBar label="rerank" value={source.rerankScore} />
             <ScoreBar label="embedding" value={source.embeddingScore} />
+            <ScoreBar label="coverage" value={source.coverageScore} />
           </div>
           <div className="rounded-md border border-border/40 bg-background/40 p-2.5 text-xs leading-relaxed text-foreground/80">
             "{source.excerpt}"
