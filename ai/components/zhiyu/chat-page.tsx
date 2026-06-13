@@ -147,6 +147,18 @@ function toSource(chunk: ApiChunk, index: number): Source {
   }
 }
 
+function extractApiChunks(data: any): ApiChunk[] {
+  const candidates = [
+    data?.chunks,
+    data?.sources,
+    data?.references,
+    data?.results,
+    data?.retrieval?.chunks,
+  ]
+  const chunks = candidates.find((item) => Array.isArray(item))
+  return chunks || []
+}
+
 function formatScore(value?: number) {
   if (typeof value !== "number" || Number.isNaN(value)) return "--"
   return value.toFixed(3)
@@ -324,6 +336,27 @@ function MessageBubble({ message }: { message: Message }) {
             {message.content}
           </p>
         </div>
+        {message.sources && message.sources.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {message.sources.slice(0, 3).map((source, index) => (
+              <Badge
+                key={source.id}
+                variant="outline"
+                className="max-w-[220px] border-primary/20 bg-primary/10 px-2 py-1 text-[11px] text-primary"
+              >
+                <BookOpen className="mr-1 h-3 w-3 shrink-0" />
+                <span className="truncate">
+                  {index + 1}. {source.title}
+                </span>
+              </Badge>
+            ))}
+            {message.sources.length > 3 && (
+              <Badge variant="outline" className="border-border/60 px-2 py-1 text-[11px] text-muted-foreground">
+                +{message.sources.length - 3}
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -393,7 +426,7 @@ function EvidencePanel({ sources }: { sources: Source[] }) {
           ))
         ) : (
           <div className="rounded-lg border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
-            No evidence for this filter.
+            {sources.length === 0 ? "No source passages returned for the latest answer." : "No evidence for this filter."}
           </div>
         )}
       </div>
@@ -428,15 +461,21 @@ function EvidencePanelMobile({ sources }: { sources: Source[] }) {
         </Badge>
       </div>
       <div className="space-y-2">
-        {sources.map((source, index) => (
-          <EvidenceCard
-            key={source.id}
-            source={source}
-            index={index}
-            isExpanded={expandedSources.has(source.id)}
-            onToggle={() => toggleSource(source.id)}
-          />
-        ))}
+        {sources.length > 0 ? (
+          sources.map((source, index) => (
+            <EvidenceCard
+              key={source.id}
+              source={source}
+              index={index}
+              isExpanded={expandedSources.has(source.id)}
+              onToggle={() => toggleSource(source.id)}
+            />
+          ))
+        ) : (
+          <div className="rounded-lg border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
+            No source passages returned for the latest answer.
+          </div>
+        )}
       </div>
     </section>
   )
@@ -465,7 +504,7 @@ export default function ChatPage() {
             id: `hist-${entry.timestamp}-${entry.role}`,
             role: entry.role,
             content: entry.content,
-            sources: (entry.sources || []).map((chunk: ApiChunk, index: number) => toSource(chunk, index)),
+            sources: extractApiChunks(entry).map((chunk: ApiChunk, index: number) => toSource(chunk, index)),
           }))
           setMessages((prev) => [...prev, ...historyMessages])
         }
@@ -506,7 +545,7 @@ export default function ChatPage() {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: data.answer || "No answer yet.",
-        sources: (data.chunks || []).map((chunk: ApiChunk, index: number) => toSource(chunk, index)),
+        sources: extractApiChunks(data).map((chunk: ApiChunk, index: number) => toSource(chunk, index)),
       }
 
       setMessages((prev) => [...prev, assistantMessage])
@@ -593,11 +632,9 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
-            {latestSources.length > 0 && (
-              <div className="lg:hidden">
-                <EvidencePanelMobile sources={latestSources} />
-              </div>
-            )}
+            <div className="lg:hidden">
+              <EvidencePanelMobile sources={latestSources} />
+            </div>
             <div ref={messagesEndRef} />
           </div>
 
