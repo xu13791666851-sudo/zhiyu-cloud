@@ -85,9 +85,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <Button
             size="lg"
             onClick={() => onNavigate("chat")}
-            className="group h-20 min-w-[340px] gap-4 rounded-full px-14 text-2xl font-semibold shadow-lg shadow-primary/20 md:h-24 md:min-w-[420px] md:text-3xl"
+            className="group h-16 min-w-[280px] gap-3 rounded-full px-11 text-xl font-semibold shadow-lg shadow-primary/20 md:h-20 md:min-w-[360px] md:text-2xl"
           >
-            <Sparkles className="h-7 w-7 md:h-8 md:w-8" />
+            <Sparkles className="h-6 w-6 md:h-7 md:w-7" />
             开始提问
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Button>
