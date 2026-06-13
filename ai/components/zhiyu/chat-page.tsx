@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Database,
   Download,
+  FileText,
   Layers3,
   Send,
   Sparkles,
@@ -18,6 +19,13 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
@@ -66,6 +74,19 @@ interface ApiChunk {
   section_title?: string | null
 }
 
+interface ApiDocument {
+  id: number
+  title: string
+  file_name: string | null
+  status: string
+  chunk_count: number
+}
+
+interface ChatPageProps {
+  selectedDocumentId?: number | null
+  onDocumentScopeChange?: (documentId: number | null) => void
+}
+
 const credibilityConfig = {
   high: {
     label: "High confidence",
@@ -94,6 +115,11 @@ const initialMessages: Message[] = [
 ]
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
+const ALL_DOCUMENTS_SCOPE = "all"
+
+function getDocumentDisplayName(document: ApiDocument) {
+  return document.title || document.file_name || `Document ${document.id}`
+}
 
 function looksMojibake(value?: string | null) {
   const text = (value || "").trim()
@@ -336,24 +362,54 @@ function MessageBubble({ message }: { message: Message }) {
             {message.content}
           </p>
         </div>
-        {message.sources && message.sources.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {message.sources.slice(0, 3).map((source, index) => (
-              <Badge
-                key={source.id}
-                variant="outline"
-                className="max-w-[220px] border-primary/20 bg-primary/10 px-2 py-1 text-[11px] text-primary"
-              >
-                <BookOpen className="mr-1 h-3 w-3 shrink-0" />
-                <span className="truncate">
-                  {index + 1}. {source.title}
-                </span>
+        {message.sources !== undefined && (
+          <div className="rounded-lg border border-border/50 bg-card/35 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium text-foreground">Sources</div>
+              <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                {message.sources.length}
               </Badge>
-            ))}
-            {message.sources.length > 3 && (
-              <Badge variant="outline" className="border-border/60 px-2 py-1 text-[11px] text-muted-foreground">
-                +{message.sources.length - 3}
-              </Badge>
+            </div>
+            {message.sources.length > 0 ? (
+              <div className="space-y-2">
+                {message.sources.slice(0, 3).map((source, index) => (
+                  <div key={source.id} className="rounded-md border border-border/40 bg-background/35 p-2.5">
+                    <div className="flex items-start gap-2">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-primary/30 bg-primary/10 text-[10px] font-semibold text-primary">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="line-clamp-2 text-xs font-medium text-foreground">{source.title}</div>
+                        <div className="flex flex-wrap gap-1">
+                          {source.page && (
+                            <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
+                              <BookOpen className="mr-1 h-3 w-3" />
+                              {source.page}
+                            </Badge>
+                          )}
+                          {source.documentId !== undefined && (
+                            <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
+                              doc {source.documentId}
+                            </Badge>
+                          )}
+                        </div>
+                        {source.excerpt && (
+                          <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                            {source.excerpt}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {message.sources.length > 3 && (
+                  <div className="text-xs text-muted-foreground">+{message.sources.length - 3} more in the side panel</div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
+                No source passages returned for this answer.
+              </div>
             )}
           </div>
         )}
@@ -481,19 +537,36 @@ function EvidencePanelMobile({ sources }: { sources: Source[] }) {
   )
 }
 
-export default function ChatPage() {
+export default function ChatPage({ selectedDocumentId = null, onDocumentScopeChange }: ChatPageProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [documents, setDocuments] = useState<ApiDocument[]>([])
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
   const [sessionId] = useState(() => `session-${Date.now()}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const latestSources =
-    [...messages].reverse().find((message) => message.role === "assistant" && message.sources?.length)?.sources || []
+    [...messages].reverse().find((message) => message.role === "assistant" && message.sources !== undefined)?.sources ||
+    []
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  useEffect(() => {
+    setIsLoadingDocuments(true)
+    fetch(`${API_BASE_URL}/api/documents`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        const parsedDocuments = ((data?.documents || []) as ApiDocument[]).filter(
+          (document) => document.status === "parsed" && document.chunk_count > 0,
+        )
+        setDocuments(parsedDocuments)
+      })
+      .catch((err) => console.error("Failed to load documents:", err))
+      .finally(() => setIsLoadingDocuments(false))
+  }, [])
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/history?session_id=${sessionId}`)
@@ -534,6 +607,7 @@ export default function ChatPage() {
           query: userMessage.content,
           top_k: 5,
           session_id: sessionId,
+          document_id: selectedDocumentId || undefined,
         }),
       })
       const data = await res.json()
@@ -591,12 +665,33 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen flex-col">
       <header className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm">
-        <div className="flex h-14 items-center justify-between px-4">
+        <div className="flex min-h-14 flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-sm font-semibold text-foreground">Chat</h1>
             <p className="text-xs text-muted-foreground">Ask across the knowledge base and newly uploaded documents.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-1.5">
+              <FileText className="h-4 w-4 text-primary" />
+              <Select
+                value={selectedDocumentId ? String(selectedDocumentId) : ALL_DOCUMENTS_SCOPE}
+                onValueChange={(value) => {
+                  onDocumentScopeChange?.(value === ALL_DOCUMENTS_SCOPE ? null : Number(value))
+                }}
+              >
+                <SelectTrigger className="h-8 w-[230px] border-0 bg-transparent px-1 shadow-none focus:ring-0">
+                  <SelectValue placeholder={isLoadingDocuments ? "Loading documents..." : "All documents"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_DOCUMENTS_SCOPE}>All documents</SelectItem>
+                  {documents.map((document) => (
+                    <SelectItem key={document.id} value={String(document.id)}>
+                      {getDocumentDisplayName(document)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button variant="ghost" size="sm" onClick={handleExport} className="h-8 gap-1 text-xs">
               <Download className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Export</span>
