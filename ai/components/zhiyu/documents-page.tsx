@@ -8,6 +8,7 @@ import {
   Eye,
   FileText,
   FolderOpen,
+  MessageSquare,
   MoreVertical,
   RefreshCw,
   Search,
@@ -123,11 +124,13 @@ function DocumentCard({
   document,
   onDelete,
   onPreview,
+  onAsk,
   deletingId,
 }: {
   document: ApiDocument
   onDelete: (id: number) => void
   onPreview: (doc: ApiDocument) => void
+  onAsk: (id: number) => void
   deletingId: number | null
 }) {
   const config = statusConfig[document.status] ?? statusConfig.pending
@@ -167,6 +170,17 @@ function DocumentCard({
               {config.label}
             </Badge>
 
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 border-primary/20 bg-primary/10 px-2 text-xs text-primary hover:bg-primary/15"
+              onClick={() => onAsk(document.id)}
+              disabled={document.status !== "parsed" || document.chunk_count <= 0}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">问这篇</span>
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -195,7 +209,7 @@ function DocumentCard({
   )
 }
 
-export default function DocumentsPage() {
+export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (documentId: number) => void }) {
   const [documents, setDocuments] = useState<ApiDocument[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isDragging, setIsDragging] = useState(false)
@@ -465,6 +479,7 @@ export default function DocumentsPage() {
                 document={doc}
                 onDelete={handleDelete}
                 onPreview={handlePreview}
+                onAsk={(id) => onAskDocument?.(id)}
                 deletingId={deletingId}
               />
             ))
