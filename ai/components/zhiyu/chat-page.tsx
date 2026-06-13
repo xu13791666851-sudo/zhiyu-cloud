@@ -12,6 +12,7 @@ import {
   Download,
   FileText,
   Layers3,
+  ListChecks,
   Send,
   Sparkles,
   Trash2,
@@ -54,6 +55,22 @@ interface Message {
   role: "user" | "assistant"
   content: string
   sources?: Source[]
+  agent?: AgentTrace
+}
+
+interface AgentStep {
+  name: string
+  tool?: string
+  detail: string
+  status?: string
+}
+
+interface AgentTrace {
+  task: string
+  task_label: string
+  steps: AgentStep[]
+  selected_document_ids?: number[]
+  selection_reason?: string
 }
 
 interface ApiChunk {
@@ -110,7 +127,7 @@ const initialMessages: Message[] = [
     id: "welcome",
     role: "assistant",
     content:
-      "Hi, I am ZhiYu, your literature assistant. I will search uploaded and parsed documents first, then attach the source passages.",
+      "Hi, I am ZhiYu Research Agent. I can summarize one paper, compare papers, search related studies, and draft cited literature reviews from your parsed documents.",
   },
 ]
 
@@ -214,6 +231,40 @@ function ScoreBar({ label, value }: { label: string; value?: number }) {
           style={{ width: `${scorePercent(value)}%` }}
         />
       </div>
+    </div>
+  )
+}
+
+function AgentTracePanel({ agent }: { agent: AgentTrace }) {
+  return (
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+          <ListChecks className="h-4 w-4 text-primary" />
+          <span>Agent workflow</span>
+        </div>
+        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+          {agent.task_label || agent.task}
+        </Badge>
+      </div>
+      <div className="space-y-2">
+        {agent.steps.map((step, index) => (
+          <div key={`${step.name}-${index}`} className="flex gap-2 text-xs">
+            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-primary/30 bg-primary/10 text-[10px] font-semibold text-primary">
+              {index + 1}
+            </div>
+            <div className="min-w-0">
+              <div className="font-medium text-foreground">{step.name}</div>
+              <div className="leading-relaxed text-muted-foreground">{step.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {agent.selection_reason && (
+        <div className="mt-2 rounded-md border border-border/40 bg-background/30 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
+          {agent.selection_reason}
+        </div>
+      )}
     </div>
   )
 }
@@ -362,6 +413,7 @@ function MessageBubble({ message }: { message: Message }) {
             {message.content}
           </p>
         </div>
+        {message.agent && <AgentTracePanel agent={message.agent} />}
         {message.sources !== undefined && (
           <div className="rounded-lg border border-border/50 bg-card/35 p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -600,7 +652,7 @@ export default function ChatPage({ selectedDocumentId = null, onDocumentScopeCha
     setIsLoading(true)
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat`, {
+      const res = await fetch(`${API_BASE_URL}/api/agent/research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -620,6 +672,7 @@ export default function ChatPage({ selectedDocumentId = null, onDocumentScopeCha
         role: "assistant",
         content: data.answer || "No answer yet.",
         sources: extractApiChunks(data).map((chunk: ApiChunk, index: number) => toSource(chunk, index)),
+        agent: data.agent,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
@@ -667,8 +720,8 @@ export default function ChatPage({ selectedDocumentId = null, onDocumentScopeCha
       <header className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="flex min-h-14 flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-sm font-semibold text-foreground">Chat</h1>
-            <p className="text-xs text-muted-foreground">Ask across the knowledge base and newly uploaded documents.</p>
+            <h1 className="text-sm font-semibold text-foreground">Research Agent</h1>
+            <p className="text-xs text-muted-foreground">Summarize, compare, search, and draft literature reviews with citations.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-1.5">
@@ -722,7 +775,7 @@ export default function ChatPage({ selectedDocumentId = null, onDocumentScopeCha
                     <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
                     <div className="delay-150 h-2 w-2 animate-pulse rounded-full bg-primary" />
                     <div className="delay-300 h-2 w-2 animate-pulse rounded-full bg-primary" />
-                    <span className="ml-2 text-xs text-muted-foreground">Retrieving and generating...</span>
+                    <span className="ml-2 text-xs text-muted-foreground">Planning, retrieving, and writing...</span>
                   </div>
                 </div>
               </div>
@@ -741,7 +794,7 @@ export default function ChatPage({ selectedDocumentId = null, onDocumentScopeCha
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask a question..."
+                  placeholder="Try: 这篇讲什么 / 对比两篇 / 帮我找相关研究 / 写一段综述"
                   className="min-h-[44px] max-h-32 resize-none border-border/50 bg-secondary/50 focus:border-primary"
                   rows={1}
                 />
