@@ -11,6 +11,12 @@ type TabType = "home" | "chat" | "documents"
 
 export default function ZhiYuApp() {
   const [activeTab, setActiveTab] = useState<TabType>("home")
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
+
+  const handleAskDocument = (documentId: number) => {
+    setSelectedDocumentId(documentId)
+    setActiveTab("chat")
+  }
 
   const tabs = [
     { id: "home" as const, label: "首页", icon: Home },
@@ -23,9 +29,9 @@ export default function ZhiYuApp() {
       case "home":
         return <HomePage onNavigate={setActiveTab} />
       case "chat":
-        return <ChatPage />
+        return <ChatPage selectedDocumentId={selectedDocumentId} onDocumentScopeChange={setSelectedDocumentId} />
       case "documents":
-        return <DocumentsPage />
+        return <DocumentsPage onAskDocument={handleAskDocument} />
     }
   }
 
