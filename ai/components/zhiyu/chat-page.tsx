@@ -102,6 +102,8 @@ interface ApiDocument {
 interface ChatPageProps {
   selectedDocumentId?: number | null
   onDocumentScopeChange?: (documentId: number | null) => void
+  initialQuestion?: string | null
+  onInitialQuestionConsumed?: () => void
 }
 
 const credibilityConfig = {
@@ -589,7 +591,12 @@ function EvidencePanelMobile({ sources }: { sources: Source[] }) {
   )
 }
 
-export default function ChatPage({ selectedDocumentId = null, onDocumentScopeChange }: ChatPageProps) {
+export default function ChatPage({
+  selectedDocumentId = null,
+  onDocumentScopeChange,
+  initialQuestion = null,
+  onInitialQuestionConsumed,
+}: ChatPageProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -605,6 +612,13 @@ export default function ChatPage({ selectedDocumentId = null, onDocumentScopeCha
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  useEffect(() => {
+    if (!initialQuestion) return
+    setInput(initialQuestion)
+    textareaRef.current?.focus()
+    onInitialQuestionConsumed?.()
+  }, [initialQuestion, onInitialQuestionConsumed])
 
   useEffect(() => {
     setIsLoadingDocuments(true)
