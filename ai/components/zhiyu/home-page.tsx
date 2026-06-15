@@ -8,6 +8,7 @@ type TabType = "home" | "chat" | "documents"
 
 interface HomePageProps {
   onNavigate: (tab: TabType) => void
+  onAskQuestion?: (question: string) => void
 }
 
 const features = [
@@ -43,13 +44,26 @@ const features = [
   },
 ]
 
-const suggestedQuestions = [
-  "深圳国贸大厦的滑模施工技术有什么特点？",
-  "深圳华侨城片区的规划建设主导者是谁？",
-  "南头古城城墙的建造年代有哪几种说法？",
+const demoQuestions = [
+  {
+    label: "文献摘要",
+    question: "这篇文献主要讲什么？请按研究问题、研究方法、核心结论和建筑学价值总结。",
+  },
+  {
+    label: "多文献对比",
+    question: "请对比两篇与城市更新相关的文献，整理它们的研究对象、研究方法和主要结论差异。",
+  },
+  {
+    label: "相关研究",
+    question: "帮我找建筑学中关于社区公共空间更新的相关研究，并说明每篇文献和这个主题的关系。",
+  },
+  {
+    label: "引用综述",
+    question: "请写一段关于社区公共空间更新的文献综述，并在关键观点后附上引用来源。",
+  },
 ]
 
-export default function HomePage({ onNavigate }: HomePageProps) {
+export default function HomePage({ onNavigate, onAskQuestion }: HomePageProps) {
   return (
     <div className="min-h-screen overflow-y-auto">
       {/* Hero Section */}
@@ -133,10 +147,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <Card className="border-border/50 bg-[#131212]">
             <CardContent className="p-6 md:p-8">
               <h2 className="mb-2 text-lg font-semibold text-foreground md:text-xl">
-                💬 快速开始提问
+                💬 Agent 演示问题
               </h2>
               <p className="mb-6 text-sm text-muted-foreground">
-                点击下方问题快速体验，或直接进入问答页面
+                这 4 个问题对应摘要、对比、检索和综述四类研究任务
               </p>
 
               {/* Quick Start Input */}
@@ -152,20 +166,22 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 </div>
               </button>
 
-              {/* Suggested Questions */}
+              {/* Demo Questions */}
               <div>
                 <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                  推荐问题：
+                  固定示例：
                 </h3>
                 <div className="flex flex-col gap-2">
-                  {suggestedQuestions.map((question, index) => (
+                  {demoQuestions.map((item, index) => (
                     <button
                       key={index}
-                      onClick={() => onNavigate("chat")}
+                      onClick={() => onAskQuestion?.(item.question)}
                       className="flex items-start gap-2 rounded-lg border border-border/50 bg-secondary/30 px-4 py-3 text-left text-sm text-foreground transition-all hover:border-primary/50 hover:bg-secondary"
                     >
-                      <span className="text-primary">•</span>
-                      <span className="line-clamp-2">{question}</span>
+                      <span className="shrink-0 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {item.label}
+                      </span>
+                      <span className="line-clamp-2">{item.question}</span>
                     </button>
                   ))}
                 </div>
