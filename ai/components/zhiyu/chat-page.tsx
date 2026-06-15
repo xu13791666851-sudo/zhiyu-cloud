@@ -71,6 +71,15 @@ interface AgentTrace {
   steps: AgentStep[]
   selected_document_ids?: number[]
   selection_reason?: string
+  citation_check?: CitationCheck
+}
+
+interface CitationCheck {
+  evidence_state: string
+  available_source_count: number
+  cited_source_count: number
+  cited_sources: string[]
+  unsupported_citations: string[]
 }
 
 interface ApiChunk {
@@ -243,12 +252,18 @@ function AgentTracePanel({ agent }: { agent: AgentTrace }) {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs font-medium text-foreground">
           <ListChecks className="h-4 w-4 text-primary" />
-          <span>Agent workflow</span>
+          <span>Agent 工作流程</span>
         </div>
         <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
           {agent.task_label || agent.task}
         </Badge>
       </div>
+      {agent.citation_check && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-border/40 bg-background/30 px-2.5 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">证据状态：{agent.citation_check.evidence_state}</span>
+          <span>已引用 {agent.citation_check.cited_source_count}/{agent.citation_check.available_source_count} 条来源</span>
+        </div>
+      )}
       <div className="space-y-2">
         {agent.steps.map((step, index) => (
           <div key={`${step.name}-${index}`} className="flex gap-2 text-xs">
@@ -335,7 +350,7 @@ function EvidenceCard({
         <div className="space-y-3 border-t border-border/50 p-3">
           <div className="space-y-1.5">
             <div className="text-[11px] font-medium uppercase text-muted-foreground">
-              Original passage
+              支持片段
             </div>
             <div className="rounded-md border border-border/40 bg-background/40 p-2.5 text-xs leading-relaxed text-foreground/80">
               "{source.excerpt}"
@@ -343,7 +358,7 @@ function EvidenceCard({
           </div>
           <details className="group rounded-md border border-border/40 bg-background/30">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
-              <span>Details / debug info</span>
+              <span>检索细节</span>
               <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
             </summary>
             <div className="space-y-3 border-t border-border/40 p-2.5">
@@ -419,7 +434,7 @@ function MessageBubble({ message }: { message: Message }) {
         {message.sources !== undefined && (
           <div className="rounded-lg border border-border/50 bg-card/35 p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="text-xs font-medium text-foreground">Sources</div>
+              <div className="text-xs font-medium text-foreground">证据来源</div>
               <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
                 {message.sources.length}
               </Badge>
@@ -457,12 +472,12 @@ function MessageBubble({ message }: { message: Message }) {
                   </div>
                 ))}
                 {message.sources.length > 3 && (
-                  <div className="text-xs text-muted-foreground">+{message.sources.length - 3} more in the side panel</div>
+                  <div className="text-xs text-muted-foreground">右侧还有 {message.sources.length - 3} 条来源</div>
                 )}
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-                No source passages returned for this answer.
+                没有返回可支持回答的来源片段。
               </div>
             )}
           </div>
@@ -498,11 +513,11 @@ function EvidencePanel({ sources }: { sources: Source[] }) {
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Evidence</h2>
-            <p className="text-xs text-muted-foreground">Sources from the latest answer</p>
+            <h2 className="text-sm font-semibold text-foreground">证据来源</h2>
+            <p className="text-xs text-muted-foreground">支撑上一条回答的文献片段</p>
           </div>
           <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-            {sources.length} sources
+            {sources.length} 条来源
           </Badge>
         </div>
         <div className="mt-3 flex rounded-lg border border-border/50 bg-secondary/30 p-1">
@@ -536,7 +551,7 @@ function EvidencePanel({ sources }: { sources: Source[] }) {
           ))
         ) : (
           <div className="rounded-lg border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
-            {sources.length === 0 ? "No source passages returned for the latest answer." : "No evidence for this filter."}
+            {sources.length === 0 ? "上一条回答没有返回来源片段。" : "当前筛选条件下没有证据片段。"}
           </div>
         )}
       </div>
@@ -563,11 +578,11 @@ function EvidencePanelMobile({ sources }: { sources: Source[] }) {
     <section className="space-y-3 rounded-lg border border-border/60 bg-card/40 p-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Evidence</h2>
-          <p className="text-xs text-muted-foreground">Sources from the latest answer</p>
+          <h2 className="text-sm font-semibold text-foreground">证据来源</h2>
+          <p className="text-xs text-muted-foreground">支撑上一条回答的文献片段</p>
         </div>
         <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-          {sources.length} sources
+          {sources.length} 条来源
         </Badge>
       </div>
       <div className="space-y-2">
@@ -583,7 +598,7 @@ function EvidencePanelMobile({ sources }: { sources: Source[] }) {
           ))
         ) : (
           <div className="rounded-lg border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
-            No source passages returned for the latest answer.
+            上一条回答没有返回来源片段。
           </div>
         )}
       </div>
