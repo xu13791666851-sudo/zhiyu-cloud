@@ -431,57 +431,6 @@ function MessageBubble({ message }: { message: Message }) {
           </p>
         </div>
         {message.agent && <AgentTracePanel agent={message.agent} />}
-        {message.sources !== undefined && (
-          <div className="rounded-lg border border-border/50 bg-card/35 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="text-xs font-medium text-foreground">证据来源</div>
-              <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                {message.sources.length}
-              </Badge>
-            </div>
-            {message.sources.length > 0 ? (
-              <div className="space-y-2">
-                {message.sources.slice(0, 3).map((source, index) => (
-                  <div key={source.id} className="rounded-md border border-border/40 bg-background/35 p-2.5">
-                    <div className="flex items-start gap-2">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-primary/30 bg-primary/10 text-[10px] font-semibold text-primary">
-                        {index + 1}
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="line-clamp-2 text-xs font-medium text-foreground">{source.title}</div>
-                        <div className="flex flex-wrap gap-1">
-                          {source.page && (
-                            <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
-                              <BookOpen className="mr-1 h-3 w-3" />
-                              {source.page}
-                            </Badge>
-                          )}
-                          {source.documentId !== undefined && (
-                            <Badge variant="outline" className="h-5 border-border/70 px-1.5 text-[10px] text-muted-foreground">
-                              doc {source.documentId}
-                            </Badge>
-                          )}
-                        </div>
-                        {source.excerpt && (
-                          <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                            {source.excerpt}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {message.sources.length > 3 && (
-                  <div className="text-xs text-muted-foreground">右侧还有 {message.sources.length - 3} 条来源</div>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-                没有返回可支持回答的来源片段。
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -556,53 +505,6 @@ function EvidencePanel({ sources }: { sources: Source[] }) {
         )}
       </div>
     </aside>
-  )
-}
-
-function EvidencePanelMobile({ sources }: { sources: Source[] }) {
-  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set(["src-0"]))
-
-  const toggleSource = (sourceId: string) => {
-    setExpandedSources((prev) => {
-      const next = new Set(prev)
-      if (next.has(sourceId)) {
-        next.delete(sourceId)
-      } else {
-        next.add(sourceId)
-      }
-      return next
-    })
-  }
-
-  return (
-    <section className="space-y-3 rounded-lg border border-border/60 bg-card/40 p-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">证据来源</h2>
-          <p className="text-xs text-muted-foreground">支撑上一条回答的文献片段</p>
-        </div>
-        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-          {sources.length} 条来源
-        </Badge>
-      </div>
-      <div className="space-y-2">
-        {sources.length > 0 ? (
-          sources.map((source, index) => (
-            <EvidenceCard
-              key={source.id}
-              source={source}
-              index={index}
-              isExpanded={expandedSources.has(source.id)}
-              onToggle={() => toggleSource(source.id)}
-            />
-          ))
-        ) : (
-          <div className="rounded-lg border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
-            上一条回答没有返回来源片段。
-          </div>
-        )}
-      </div>
-    </section>
   )
 }
 
@@ -809,9 +711,6 @@ export default function ChatPage({
                 </div>
               </div>
             )}
-            <div className="lg:hidden">
-              <EvidencePanelMobile sources={latestSources} />
-            </div>
             <div ref={messagesEndRef} />
           </div>
 
