@@ -1,6 +1,6 @@
 "use client"
 
-import { Upload, MessageSquare, Link2, Search, BookOpen, Globe, ArrowRight, Sparkles } from "lucide-react"
+import { Upload, MessageSquare, Link2, Search, BookOpen, ListChecks, ArrowRight, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -14,32 +14,32 @@ const features = [
   {
     icon: Upload,
     title: "上传文献",
-    description: "支持 PDF/Word 文档上传与解析",
+    description: "支持 PDF、Word、文本上传与自动解析",
   },
   {
-    icon: MessageSquare,
-    title: "智能问答",
-    description: "基于知识库的 RAG 问答系统",
-  },
-  {
-    icon: Link2,
-    title: "溯源引用",
-    description: "每条回答标注文献来源与页码",
+    icon: ListChecks,
+    title: "任务识别",
+    description: "自动判断摘要、对比、检索或综述任务",
   },
   {
     icon: Search,
-    title: "实体识别",
-    description: "自动识别建筑、人物等实体",
+    title: "全库检索",
+    description: "从已解析文献中查找相关研究片段",
   },
   {
     icon: BookOpen,
-    title: "文献推荐",
-    description: "智能推荐相关核心文献",
+    title: "文献摘要",
+    description: "快速梳理论文主题、方法与核心结论",
   },
   {
-    icon: Globe,
-    title: "多领域接入",
-    description: "支持建筑史、法学、医学等领域",
+    icon: MessageSquare,
+    title: "多文献对比",
+    description: "对比不同文献的观点、方法和研究对象",
+  },
+  {
+    icon: Link2,
+    title: "引用综述",
+    description: "生成带来源引用的建筑学文献综述",
   },
 ]
 
