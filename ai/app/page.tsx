@@ -1,13 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { Home, MessageSquare, FolderOpen } from "lucide-react"
+import { BarChart3, Home, MessageSquare, FolderOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import HomePage from "@/components/zhiyu/home-page"
 import ChatPage from "@/components/zhiyu/chat-page"
 import DocumentsPage from "@/components/zhiyu/documents-page"
+import EvaluationPage from "@/components/zhiyu/evaluation-page"
 
-type TabType = "home" | "chat" | "documents"
+type TabType = "home" | "chat" | "documents" | "evaluation"
 
 export default function ZhiYuApp() {
   const [activeTab, setActiveTab] = useState<TabType>("home")
@@ -28,6 +29,7 @@ export default function ZhiYuApp() {
     { id: "home" as const, label: "首页", icon: Home },
     { id: "chat" as const, label: "问答", icon: MessageSquare },
     { id: "documents" as const, label: "文献", icon: FolderOpen },
+    { id: "evaluation" as const, label: "评估", icon: BarChart3 },
   ]
 
   const renderContent = () => {
@@ -45,6 +47,8 @@ export default function ZhiYuApp() {
         )
       case "documents":
         return <DocumentsPage onAskDocument={handleAskDocument} />
+      case "evaluation":
+        return <EvaluationPage />
     }
   }
 
