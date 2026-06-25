@@ -6,8 +6,10 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  ExternalLink,
   FileText,
   FolderOpen,
+  Loader2,
   MessageSquare,
   MoreVertical,
   RefreshCw,
@@ -55,6 +57,15 @@ interface ApiDocument {
   chunk_count: number
   created_at: string | null
   updated_at: string | null
+}
+
+interface ApiDocumentChunk {
+  id: number
+  chunk_index: number
+  content: string
+  page_start: number | null
+  page_end: number | null
+  section_title: string | null
 }
 
 const statusConfig: Record<
@@ -255,8 +266,11 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
   const [documents, setDocuments] = useState<ApiDocument[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [previewMode, setPreviewMode] = useState<"overview" | "chunks">("overview")
   const [isDragging, setIsDragging] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<ApiDocument | null>(null)
+  const [previewChunks, setPreviewChunks] = useState<ApiDocumentChunk[]>([])
+  const [isLoadingPreviewChunks, setIsLoadingPreviewChunks] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -265,6 +279,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
   const [tagsInput, setTagsInput] = useState("")
   const [keywordsInput, setKeywordsInput] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   const loadDocuments = useCallback(async () => {
     setIsLoading(true)
@@ -402,8 +417,38 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
     []
   )
 
+  const loadPreviewChunks = useCallback(async (doc: ApiDocument) => {
+    setPreviewChunks([])
+    setPreviewError(null)
+    if (doc.status !== "parsed" || doc.chunk_count <= 0) {
+      return
+    }
+
+    setIsLoadingPreviewChunks(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${doc.id}/chunks?limit=12`, {
+        cache: "no-store",
+      })
+      if (!response.ok) {
+        throw new Error(await parseError(response))
+      }
+      const data = (await response.json()) as { chunks?: ApiDocumentChunk[] }
+      setPreviewChunks(data.chunks ?? [])
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : "加载解析片段失败")
+    } finally {
+      setIsLoadingPreviewChunks(false)
+    }
+  }, [])
+
   const handlePreview = useCallback((doc: ApiDocument) => {
+    setPreviewMode("overview")
     setPreviewDoc(doc)
+    void loadPreviewChunks(doc)
+  }, [loadPreviewChunks])
+
+  const handleOpenDocumentFile = useCallback((doc: ApiDocument) => {
+    window.open(`${API_BASE_URL}/api/documents/${doc.id}/file`, "_blank", "noopener,noreferrer")
   }, [])
 
   const handleSaveMetadata = useCallback(async () => {
@@ -600,8 +645,15 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
         </div>
       </div>
 
-      <Dialog open={!!previewDoc} onOpenChange={() => setPreviewDoc(null)}>
-        <DialogContent className="max-w-2xl">
+      <Dialog
+        open={!!previewDoc}
+        onOpenChange={() => {
+          setPreviewDoc(null)
+          setPreviewChunks([])
+          setPreviewError(null)
+        }}
+      >
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
@@ -611,6 +663,51 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
           </DialogHeader>
           {previewDoc && (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => handleOpenDocumentFile(previewDoc)}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  打开原文
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    onAskDocument?.(previewDoc.id)
+                    setPreviewDoc(null)
+                  }}
+                  disabled={previewDoc.status !== "parsed" || previewDoc.chunk_count <= 0}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  问这篇
+                </Button>
+                <div className="ml-auto flex rounded-md border border-border/50 bg-secondary/40 p-1">
+                  <Button
+                    variant={previewMode === "overview" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setPreviewMode("overview")}
+                  >
+                    基本信息
+                  </Button>
+                  <Button
+                    variant={previewMode === "chunks" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setPreviewMode("chunks")}
+                  >
+                    解析片段
+                  </Button>
+                </div>
+              </div>
+
+              {previewMode === "overview" ? (
+                <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg bg-secondary/50 p-3">
                   <p className="text-xs text-muted-foreground">文件大小</p>
@@ -692,6 +789,66 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                   {previewDoc.file_url ? ` / 文件地址: ${previewDoc.file_url}` : ""}
                 </p>
               </div>
+                </>
+              ) : (
+                <div className="rounded-lg border border-border/50 bg-secondary/30 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">解析片段预览</p>
+                      <p className="text-xs text-muted-foreground">
+                        显示前 12 个文本片段，用来检查文献是否被正确读入。
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadPreviewChunks(previewDoc)}
+                      disabled={isLoadingPreviewChunks}
+                    >
+                      {isLoadingPreviewChunks ? "刷新中..." : "刷新"}
+                    </Button>
+                  </div>
+
+                  {previewError && (
+                    <div className="mb-3 rounded-md border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-300">
+                      {previewError}
+                    </div>
+                  )}
+
+                  {isLoadingPreviewChunks ? (
+                    <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      正在读取解析片段...
+                    </div>
+                  ) : previewChunks.length === 0 ? (
+                    <div className="py-12 text-center text-sm text-muted-foreground">
+                      这篇文献还没有可查看的解析片段。
+                    </div>
+                  ) : (
+                    <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                      {previewChunks.map((chunk) => (
+                        <div key={chunk.id} className="rounded-md border border-border/50 bg-background/40 p-3">
+                          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              片段 {chunk.chunk_index + 1}
+                            </Badge>
+                            {chunk.section_title && <span>{chunk.section_title}</span>}
+                            {chunk.page_start && (
+                              <span>
+                                页码 {chunk.page_start}
+                                {chunk.page_end && chunk.page_end !== chunk.page_start ? `-${chunk.page_end}` : ""}
+                              </span>
+                            )}
+                          </div>
+                          <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/90">
+                            {chunk.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
