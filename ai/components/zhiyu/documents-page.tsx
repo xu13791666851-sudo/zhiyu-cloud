@@ -68,6 +68,21 @@ interface ApiDocumentChunk {
   section_title: string | null
 }
 
+interface ApiResearchCard {
+  [key: string]: unknown
+}
+
+const researchCardSections = [
+  ["research_object", "研究对象"],
+  ["core_question", "核心问题"],
+  ["main_arguments", "主要观点"],
+  ["method_or_material", "方法 / 材料 / 案例"],
+  ["key_findings", "关键结论"],
+  ["theoretical_contribution", "理论贡献"],
+  ["research_value", "对研究的启发"],
+  ["limitations", "局限或待确认处"],
+] as const
+
 const statusConfig: Record<
   DocumentStatus,
   {
@@ -139,6 +154,21 @@ function metadataList(document: ApiDocument, key: string) {
       .filter(Boolean)
   }
   return []
+}
+
+function metadataCard(document: ApiDocument) {
+  const value = document.metadata?.research_card
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as ApiResearchCard) : null
+}
+
+function cardText(card: ApiResearchCard | null, key: string) {
+  if (!card) return ""
+  const value = card[key]
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean).join("；")
+  }
+  if (value === null || value === undefined) return ""
+  return String(value).trim()
 }
 
 function splitInputList(value: string) {
@@ -266,11 +296,14 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
   const [documents, setDocuments] = useState<ApiDocument[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
-  const [previewMode, setPreviewMode] = useState<"overview" | "chunks">("overview")
+  const [previewMode, setPreviewMode] = useState<"card" | "overview" | "chunks">("card")
   const [isDragging, setIsDragging] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<ApiDocument | null>(null)
   const [previewChunks, setPreviewChunks] = useState<ApiDocumentChunk[]>([])
+  const [researchCard, setResearchCard] = useState<ApiResearchCard | null>(null)
   const [isLoadingPreviewChunks, setIsLoadingPreviewChunks] = useState(false)
+  const [isLoadingResearchCard, setIsLoadingResearchCard] = useState(false)
+  const [isGeneratingResearchCard, setIsGeneratingResearchCard] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -280,6 +313,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
   const [keywordsInput, setKeywordsInput] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
+  const [researchCardError, setResearchCardError] = useState<string | null>(null)
 
   const loadDocuments = useCallback(async () => {
     setIsLoading(true)
@@ -441,11 +475,75 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
     }
   }, [])
 
+  const loadResearchCard = useCallback(async (doc: ApiDocument) => {
+    setResearchCard(metadataCard(doc))
+    setResearchCardError(null)
+    if (doc.status !== "parsed" || doc.chunk_count <= 0) {
+      return
+    }
+
+    setIsLoadingResearchCard(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${doc.id}/research-card`, {
+        cache: "no-store",
+      })
+      if (response.status === 404) {
+        setResearchCard(null)
+        return
+      }
+      if (!response.ok) {
+        throw new Error(await parseError(response))
+      }
+      const data = (await response.json()) as { research_card?: ApiResearchCard; document?: ApiDocument }
+      setResearchCard(data.research_card ?? null)
+      if (data.document) {
+        setPreviewDoc(data.document)
+        setDocuments((prev) => prev.map((item) => (item.id === data.document?.id ? data.document : item)))
+      }
+    } catch (err) {
+      setResearchCardError(err instanceof Error ? err.message : "加载文献卡片失败")
+    } finally {
+      setIsLoadingResearchCard(false)
+    }
+  }, [])
+
+  const handleGenerateResearchCard = useCallback(
+    async (force = false) => {
+      if (!previewDoc) return
+
+      setIsGeneratingResearchCard(true)
+      setResearchCardError(null)
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/documents/${previewDoc.id}/research-card?force=${force ? "true" : "false"}`,
+          { method: "POST" }
+        )
+        if (!response.ok) {
+          throw new Error(await parseError(response))
+        }
+        const data = (await response.json()) as { research_card?: ApiResearchCard; document?: ApiDocument }
+        setResearchCard(data.research_card ?? null)
+        if (data.document) {
+          setDocuments((prev) => prev.map((item) => (item.id === data.document?.id ? data.document : item)))
+          setPreviewDoc(data.document)
+        }
+        setPreviewMode("card")
+      } catch (err) {
+        setResearchCardError(err instanceof Error ? err.message : "生成文献卡片失败")
+      } finally {
+        setIsGeneratingResearchCard(false)
+      }
+    },
+    [previewDoc]
+  )
+
   const handlePreview = useCallback((doc: ApiDocument) => {
-    setPreviewMode("overview")
+    setPreviewMode("card")
     setPreviewDoc(doc)
+    setResearchCard(metadataCard(doc))
     void loadPreviewChunks(doc)
-  }, [loadPreviewChunks])
+    void loadResearchCard(doc)
+  }, [loadPreviewChunks, loadResearchCard])
 
   const handleOpenDocumentFile = useCallback((doc: ApiDocument) => {
     window.open(`${API_BASE_URL}/api/documents/${doc.id}/file`, "_blank", "noopener,noreferrer")
@@ -472,6 +570,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
       if (data.document) {
         setDocuments((prev) => prev.map((doc) => (doc.id === data.document.id ? data.document : doc)))
         setPreviewDoc(data.document)
+        setResearchCard(metadataCard(data.document) ?? researchCard)
         setError(null)
       }
     } catch (err) {
@@ -479,7 +578,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
     } finally {
       setIsSavingMetadata(false)
     }
-  }, [categoryInput, keywordsInput, previewDoc, tagsInput])
+  }, [categoryInput, keywordsInput, previewDoc, researchCard, tagsInput])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -659,7 +758,9 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
         onOpenChange={() => {
           setPreviewDoc(null)
           setPreviewChunks([])
+          setResearchCard(null)
           setPreviewError(null)
+          setResearchCardError(null)
         }}
       >
         <DialogContent className="max-w-3xl">
@@ -697,6 +798,14 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                 </Button>
                 <div className="ml-auto flex rounded-md border border-border/50 bg-secondary/40 p-1">
                   <Button
+                    variant={previewMode === "card" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setPreviewMode("card")}
+                  >
+                    文献卡片
+                  </Button>
+                  <Button
                     variant={previewMode === "overview" ? "secondary" : "ghost"}
                     size="sm"
                     className="h-8 px-3 text-xs"
@@ -715,7 +824,87 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                 </div>
               </div>
 
-              {previewMode === "overview" ? (
+              {previewMode === "card" ? (
+                <div className="rounded-lg border border-border/50 bg-secondary/30 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">自动文献卡片</p>
+                      <p className="text-xs text-muted-foreground">
+                        自动整理这篇文献的主题、观点、结论和推荐分类。
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleGenerateResearchCard(!!researchCard)}
+                      disabled={
+                        isGeneratingResearchCard ||
+                        isLoadingResearchCard ||
+                        previewDoc.status !== "parsed" ||
+                        previewDoc.chunk_count <= 0
+                      }
+                    >
+                      {isGeneratingResearchCard ? "生成中..." : researchCard ? "重新生成" : "生成卡片"}
+                    </Button>
+                  </div>
+
+                  {researchCardError && (
+                    <div className="mb-3 rounded-md border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-300">
+                      {researchCardError}
+                    </div>
+                  )}
+
+                  {isLoadingResearchCard ? (
+                    <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      正在读取文献卡片...
+                    </div>
+                  ) : !researchCard ? (
+                    <div className="py-12 text-center text-sm text-muted-foreground">
+                      这篇文献还没有生成卡片。
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        {cardText(researchCard, "suggested_category") && (
+                          <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                            {cardText(researchCard, "suggested_category")}
+                          </Badge>
+                        )}
+                        {splitInputList(cardText(researchCard, "suggested_tags")).slice(0, 6).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-muted-foreground">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="grid gap-3">
+                        {researchCardSections.map(([key, label]) => {
+                          const value = cardText(researchCard, key)
+                          if (!value) return null
+                          return (
+                            <div key={key} className="rounded-md border border-border/50 bg-background/40 p-3">
+                              <p className="mb-1 text-xs font-medium text-muted-foreground">{label}</p>
+                              <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/90">{value}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {cardText(researchCard, "suggested_keywords") && (
+                        <div className="rounded-md border border-border/50 bg-background/40 p-3">
+                          <p className="mb-2 text-xs font-medium text-muted-foreground">建议关键词</p>
+                          <div className="flex flex-wrap gap-2">
+                            {splitInputList(cardText(researchCard, "suggested_keywords")).map((keyword) => (
+                              <Badge key={keyword} variant="outline" className="text-muted-foreground">
+                                {keyword}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : previewMode === "overview" ? (
                 <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg bg-secondary/50 p-3">
