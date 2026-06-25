@@ -599,15 +599,24 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
           </div>
         )}
 
-        <div
+        <label
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={cn(
-            "mb-4 rounded-xl border-2 border-dashed p-6 text-center transition-all",
-            isDragging ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"
+            "mb-4 block rounded-xl border-2 border-dashed p-6 text-center transition-all",
+            isDragging ? "border-primary bg-primary/5" : "border-border/50 hover:border-border",
+            isUploading ? "cursor-not-allowed opacity-70" : "cursor-pointer"
           )}
         >
+          <input
+            type="file"
+            accept=".pdf,.txt,.md,.docx"
+            multiple
+            onChange={handleFileInput}
+            className="hidden"
+            disabled={isUploading}
+          />
           <Upload
             className={cn(
               "mx-auto mb-2 h-8 w-8",
@@ -618,7 +627,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
           <p className="mt-1 text-xs text-muted-foreground/60">
             上传后会自动入库，并尝试解析为可检索的 chunks
           </p>
-        </div>
+        </label>
 
         <div className="space-y-3">
           {isLoading ? (
