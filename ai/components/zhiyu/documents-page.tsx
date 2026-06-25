@@ -111,6 +111,32 @@ function getDocumentDisplayName(document: ApiDocument) {
   return document.title || document.file_name || `Document ${document.id}`
 }
 
+function metadataString(document: ApiDocument, key: string) {
+  const value = document.metadata?.[key]
+  return typeof value === "string" ? value : ""
+}
+
+function metadataList(document: ApiDocument, key: string) {
+  const value = document.metadata?.[key]
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean)
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,，;；、\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function splitInputList(value: string) {
+  return value
+    .split(/[,，;；、\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 async function parseError(response: Response) {
   try {
     const data = (await response.json()) as { detail?: string }
@@ -135,6 +161,8 @@ function DocumentCard({
 }) {
   const config = statusConfig[document.status] ?? statusConfig.pending
   const StatusIcon = config.icon
+  const category = metadataString(document, "category")
+  const tags = metadataList(document, "tags").slice(0, 3)
 
   return (
     <Card className="border-border/50 bg-card/50 transition-all hover:border-border hover:bg-card">
@@ -159,6 +187,20 @@ function DocumentCard({
                 <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   {document.author && <span>{document.author}</span>}
                   {document.source_type && <span>{document.source_type}</span>}
+                </div>
+              )}
+              {(category || tags.length > 0) && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {category && (
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-xs text-primary">
+                      {category}
+                    </Badge>
+                  )}
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-xs text-muted-foreground">
+                      {tag}
+                    </Badge>
+                  ))}
                 </div>
               )}
             </div>
@@ -212,11 +254,16 @@ function DocumentCard({
 export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (documentId: number) => void }) {
   const [documents, setDocuments] = useState<ApiDocument[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("all")
   const [isDragging, setIsDragging] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<ApiDocument | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false)
+  const [categoryInput, setCategoryInput] = useState("")
+  const [tagsInput, setTagsInput] = useState("")
+  const [keywordsInput, setKeywordsInput] = useState("")
   const [error, setError] = useState<string | null>(null)
 
   const loadDocuments = useCallback(async () => {
@@ -240,20 +287,43 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
     void loadDocuments()
   }, [loadDocuments])
 
+  useEffect(() => {
+    if (!previewDoc) return
+    setCategoryInput(metadataString(previewDoc, "category"))
+    setTagsInput(metadataList(previewDoc, "tags").join("，"))
+    setKeywordsInput(metadataList(previewDoc, "keywords").join("，"))
+  }, [previewDoc])
+
+  const categoryOptions = useMemo(() => {
+    const values = new Set<string>()
+    documents.forEach((doc) => {
+      const category = metadataString(doc, "category")
+      if (category) values.add(category)
+    })
+    return Array.from(values).sort((a, b) => a.localeCompare(b, "zh-CN"))
+  }, [documents])
+
   const filteredDocuments = useMemo(
     () =>
       documents.filter((doc) => {
+        const category = metadataString(doc, "category")
+        if (categoryFilter !== "all" && category !== categoryFilter) {
+          return false
+        }
         const haystack = [
           getDocumentDisplayName(doc),
           doc.file_name ?? "",
           doc.author ?? "",
           doc.source_type ?? "",
+          category,
+          ...metadataList(doc, "tags"),
+          ...metadataList(doc, "keywords"),
         ]
           .join(" ")
           .toLowerCase()
         return haystack.includes(searchQuery.toLowerCase())
       }),
-    [documents, searchQuery]
+    [documents, searchQuery, categoryFilter]
   )
 
   const stats = useMemo(
@@ -336,6 +406,36 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
     setPreviewDoc(doc)
   }, [])
 
+  const handleSaveMetadata = useCallback(async () => {
+    if (!previewDoc) return
+
+    setIsSavingMetadata(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${previewDoc.id}/metadata`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: categoryInput.trim() || null,
+          tags: splitInputList(tagsInput),
+          keywords: splitInputList(keywordsInput),
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(await parseError(response))
+      }
+      const data = (await response.json()) as { document: ApiDocument }
+      if (data.document) {
+        setDocuments((prev) => prev.map((doc) => (doc.id === data.document.id ? data.document : doc)))
+        setPreviewDoc(data.document)
+        setError(null)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存分类信息失败")
+    } finally {
+      setIsSavingMetadata(false)
+    }
+  }, [categoryInput, keywordsInput, previewDoc, tagsInput])
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(true)
@@ -414,6 +514,19 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
               className="border-border/50 bg-secondary/50 pl-9"
             />
           </div>
+          <select
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+            className="h-10 w-36 rounded-md border border-border/50 bg-secondary/50 px-3 text-sm text-foreground outline-none focus:border-primary"
+            aria-label="按分类筛选"
+          >
+            <option value="all">全部分类</option>
+            {categoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
           <label>
             <input
               type="file"
@@ -530,6 +643,35 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                   <p className="text-sm font-medium text-foreground">
                     {previewDoc.source_type || "-"}
                   </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/50 bg-secondary/30 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">分类与关键词</p>
+                    <p className="text-xs text-muted-foreground">用逗号分隔多个标签或关键词</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={handleSaveMetadata} disabled={isSavingMetadata}>
+                    {isSavingMetadata ? "保存中..." : "保存"}
+                  </Button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Input
+                    value={categoryInput}
+                    onChange={(event) => setCategoryInput(event.target.value)}
+                    placeholder="主分类，如 岭南庭园"
+                  />
+                  <Input
+                    value={tagsInput}
+                    onChange={(event) => setTagsInput(event.target.value)}
+                    placeholder="标签，如 夏昌世，莫伯治"
+                  />
+                  <Input
+                    value={keywordsInput}
+                    onChange={(event) => setKeywordsInput(event.target.value)}
+                    placeholder="关键词，如 庭园理论，地域性"
+                  />
                 </div>
               </div>
 
