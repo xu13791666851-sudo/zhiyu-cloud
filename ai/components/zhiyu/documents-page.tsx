@@ -296,7 +296,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
   const [documents, setDocuments] = useState<ApiDocument[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
-  const [previewMode, setPreviewMode] = useState<"card" | "overview" | "chunks">("card")
+  const [previewMode, setPreviewMode] = useState<"overview" | "card" | "chunks">("overview")
   const [isDragging, setIsDragging] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<ApiDocument | null>(null)
   const [previewChunks, setPreviewChunks] = useState<ApiDocumentChunk[]>([])
@@ -538,7 +538,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
   )
 
   const handlePreview = useCallback((doc: ApiDocument) => {
-    setPreviewMode("card")
+    setPreviewMode("overview")
     setPreviewDoc(doc)
     setResearchCard(metadataCard(doc))
     void loadPreviewChunks(doc)
@@ -763,7 +763,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
           setResearchCardError(null)
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[86vh] max-w-3xl overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
@@ -772,7 +772,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
             <DialogDescription>查看后端真实存储的文档信息和解析状态。</DialogDescription>
           </DialogHeader>
           {previewDoc && (
-            <div className="space-y-4">
+            <div className="flex max-h-[calc(86vh-7rem)] flex-col gap-4 overflow-hidden">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
@@ -824,6 +824,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                 </div>
               </div>
 
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {previewMode === "card" ? (
                 <div className="rounded-lg border border-border/50 bg-secondary/30 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
@@ -864,7 +865,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                       这篇文献还没有生成卡片。
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div className="flex flex-wrap gap-2">
                         {cardText(researchCard, "suggested_category") && (
                           <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
@@ -884,7 +885,9 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                           return (
                             <div key={key} className="rounded-md border border-border/50 bg-background/40 p-3">
                               <p className="mb-1 text-xs font-medium text-muted-foreground">{label}</p>
-                              <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/90">{value}</p>
+                              <p className="max-h-28 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-foreground/90">
+                                {value}
+                              </p>
                             </div>
                           )
                         })}
@@ -1047,6 +1050,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
                   )}
                 </div>
               )}
+              </div>
             </div>
           )}
         </DialogContent>
