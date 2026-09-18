@@ -24,6 +24,13 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://zhiyu:zhiyu_password@postgres:5432/zhiyu}
       DATABASE_PATH: /data/zhiyu.db
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3001,http://127.0.0.1:3001,http://localhost:8080,http://127.0.0.1:8080}
+      USE_SUPABASE_STORAGE: ${USE_SUPABASE_STORAGE:-false}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-documents}
+      SUPABASE_STORAGE_PREFIX: ${SUPABASE_STORAGE_PREFIX:-documents}
+      SUPABASE_STORAGE_PUBLIC: ${SUPABASE_STORAGE_PUBLIC:-false}
+      SUPABASE_STORAGE_TIMEOUT: ${SUPABASE_STORAGE_TIMEOUT:-120}
       HUNYUAN_API_KEY: ${HUNYUAN_API_KEY:-}
       HUNYUAN_BASE_URL: ${HUNYUAN_BASE_URL:-https://api.hunyuan.cloud.tencent.com/v1}
       HUNYUAN_MODEL: ${HUNYUAN_MODEL:-hunyuan-lite}

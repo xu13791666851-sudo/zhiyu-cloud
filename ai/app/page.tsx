@@ -1,33 +1,76 @@
 "use client"
 
 import { useState } from "react"
-import { Home, MessageSquare, FolderOpen } from "lucide-react"
+import { BarChart3, Home, MessageSquare, FolderOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import HomePage from "@/components/zhiyu/home-page"
 import ChatPage from "@/components/zhiyu/chat-page"
 import DocumentsPage from "@/components/zhiyu/documents-page"
+import EvaluationPage from "@/components/zhiyu/evaluation-page"
 
-type TabType = "home" | "chat" | "documents"
+type TabType = "home" | "chat" | "documents" | "evaluation"
 
 export default function ZhiYuApp() {
   const [activeTab, setActiveTab] = useState<TabType>("home")
+  const [mountedTabs, setMountedTabs] = useState<Set<TabType>>(() => new Set(["home"]))
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
+  const [draftQuestion, setDraftQuestion] = useState<string | null>(null)
+
+  const switchTab = (tab: TabType) => {
+    setMountedTabs((prev) => new Set(prev).add(tab))
+    setActiveTab(tab)
+  }
+
+  const handleAskDocument = (documentId: number) => {
+    setSelectedDocumentId(documentId)
+    switchTab("chat")
+  }
+
+  const handleAskQuestion = (question: string) => {
+    setDraftQuestion(question)
+    switchTab("chat")
+  }
 
   const tabs = [
     { id: "home" as const, label: "首页", icon: Home },
     { id: "chat" as const, label: "问答", icon: MessageSquare },
     { id: "documents" as const, label: "文献", icon: FolderOpen },
+    { id: "evaluation" as const, label: "评估", icon: BarChart3 },
   ]
 
-  const renderContent = () => {
-    switch (activeTab) {
+  const renderContent = (tab: TabType) => {
+    switch (tab) {
       case "home":
-        return <HomePage onNavigate={setActiveTab} />
+        return <HomePage onNavigate={switchTab} onAskQuestion={handleAskQuestion} />
       case "chat":
-        return <ChatPage />
+        return (
+          <ChatPage
+            selectedDocumentId={selectedDocumentId}
+            onDocumentScopeChange={setSelectedDocumentId}
+            initialQuestion={draftQuestion}
+            onInitialQuestionConsumed={() => setDraftQuestion(null)}
+          />
+        )
       case "documents":
-        return <DocumentsPage />
+        return <DocumentsPage onAskDocument={handleAskDocument} />
+      case "evaluation":
+        return <EvaluationPage />
     }
   }
+
+  const renderMountedTabs = () =>
+    tabs.map((tab) => {
+      if (!mountedTabs.has(tab.id)) return null
+      return (
+        <section
+          key={tab.id}
+          className={cn(activeTab === tab.id ? "block" : "hidden")}
+          aria-hidden={activeTab !== tab.id}
+        >
+          {renderContent(tab.id)}
+        </section>
+      )
+    })
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -51,7 +94,7 @@ export default function ZhiYuApp() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => switchTab(tab.id)}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 lg:px-4",
                   isActive
@@ -69,14 +112,9 @@ export default function ZhiYuApp() {
         </div>
       </nav>
 
-      {/* Main Content Area - Mobile */}
-      <main className="flex-1 pb-16 md:hidden">
-        {renderContent()}
-      </main>
-
-      {/* Main Content Area - Desktop */}
-      <main className="hidden min-h-screen md:block md:pl-20 lg:pl-64">
-        {renderContent()}
+      {/* Main Content Area */}
+      <main className="flex-1 pb-16 md:min-h-screen md:pb-0 md:pl-20 lg:pl-64">
+        {renderMountedTabs()}
       </main>
 
       {/* Mobile Bottom Tab Bar */}
@@ -88,7 +126,7 @@ export default function ZhiYuApp() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => switchTab(tab.id)}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 rounded-lg px-4 py-2 transition-all duration-200",
                   isActive

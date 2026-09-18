@@ -1,55 +1,99 @@
 "use client"
 
-import { Upload, MessageSquare, Link2, Search, BookOpen, Globe, ArrowRight, Sparkles } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Upload, MessageSquare, Link2, Search, BookOpen, ListChecks, ArrowRight, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { API_BASE_URL, apiRequest } from "@/lib/api"
 
 type TabType = "home" | "chat" | "documents"
 
 interface HomePageProps {
   onNavigate: (tab: TabType) => void
+  onAskQuestion?: (question: string) => void
+}
+
+interface UploadedDocumentSummary {
+  status?: string
+  chunk_count?: number
 }
 
 const features = [
   {
     icon: Upload,
     title: "上传文献",
-    description: "支持 PDF/Word 文档上传与解析",
+    description: "支持 PDF、Word、文本上传与自动解析",
   },
   {
-    icon: MessageSquare,
-    title: "智能问答",
-    description: "基于知识库的 RAG 问答系统",
-  },
-  {
-    icon: Link2,
-    title: "溯源引用",
-    description: "每条回答标注文献来源与页码",
+    icon: ListChecks,
+    title: "任务识别",
+    description: "自动判断摘要、对比、检索或综述任务",
   },
   {
     icon: Search,
-    title: "实体识别",
-    description: "自动识别建筑、人物等实体",
+    title: "全库检索",
+    description: "从已解析文献中查找相关研究片段",
   },
   {
     icon: BookOpen,
-    title: "文献推荐",
-    description: "智能推荐相关核心文献",
+    title: "文献摘要",
+    description: "快速梳理论文主题、方法与核心结论",
   },
   {
-    icon: Globe,
-    title: "多领域接入",
-    description: "支持建筑史、法学、医学等领域",
+    icon: MessageSquare,
+    title: "多文献对比",
+    description: "对比不同文献的观点、方法和研究对象",
+  },
+  {
+    icon: Link2,
+    title: "引用综述",
+    description: "生成带来源引用的建筑学文献综述",
   },
 ]
 
-const suggestedQuestions = [
-  "深圳国贸大厦的滑模施工技术有什么特点？",
-  "深圳华侨城片区的规划建设主导者是谁？",
-  "南头古城城墙的建造年代有哪几种说法？",
+// 示例问题按「文献库现有主题（夏昌世 / 岭南气候适应性建筑）」逐条实测过：
+// 都能命中正确的任务类型，并且检索得到的都是库里有直接依据的文献。
+// 换文献库时记得同步调整这 4 条，否则会出现「证据不足」。
+const demoQuestions = [
+  {
+    label: "文献摘要",
+    question:
+      "请总结夏昌世与南方建筑降温研究的核心内容，按研究问题、研究方法、核心结论和建筑学价值四个方面展开。",
+  },
+  {
+    label: "多文献对比",
+    question:
+      "请对比《亚热带城市性格的塑造》和《苏联专家与夏昌世对南方建筑降温研究的交集》两篇文献，整理它们的研究对象、研究方法和结论差异。",
+  },
+  {
+    label: "相关研究",
+    question:
+      "帮我找建筑学中关于夏昌世南方建筑降温与遮阳隔热设计的相关研究，并说明这些文献与主题的关系。",
+  },
+  {
+    label: "引用综述",
+    question:
+      "请写一段关于岭南湿热气候下被动式降温设计的文献综述，并在关键观点后附上引用来源。",
+  },
 ]
 
-export default function HomePage({ onNavigate }: HomePageProps) {
+export default function HomePage({ onNavigate, onAskQuestion }: HomePageProps) {
+  // 指标区里的文献数直接读后端，不写死 —— 否则演示时数字和文献页对不上。
+  const [documentCount, setDocumentCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    apiRequest<{ documents?: UploadedDocumentSummary[] }>(`${API_BASE_URL}/api/documents`, {
+      cache: "no-store",
+    })
+      .then((data) => {
+        const ready = (data?.documents ?? []).filter(
+          (doc) => doc.status === "parsed" && (doc.chunk_count ?? 0) > 0,
+        )
+        setDocumentCount(ready.length)
+      })
+      .catch(() => setDocumentCount(null))
+  }, [])
+
   return (
     <div className="min-h-screen overflow-y-auto">
       {/* Hero Section */}
@@ -85,9 +129,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <Button
             size="lg"
             onClick={() => onNavigate("chat")}
-            className="group gap-2 rounded-full px-[90px] pr-[73px]"
+            className="group h-16 min-w-[280px] gap-3 rounded-full px-11 text-xl font-semibold shadow-lg shadow-primary/20 md:h-20 md:min-w-[360px] md:text-2xl"
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-6 w-6 md:h-7 md:w-7" />
             开始提问
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Button>
@@ -133,10 +177,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <Card className="border-border/50 bg-[#131212]">
             <CardContent className="p-6 md:p-8">
               <h2 className="mb-2 text-lg font-semibold text-foreground md:text-xl">
-                💬 快速开始提问
+                💬 Agent 演示问题
               </h2>
               <p className="mb-6 text-sm text-muted-foreground">
-                点击下方问题快速体验，或直接进入问答页面
+                这 4 个问题对应摘要、对比、检索和综述四类研究任务
               </p>
 
               {/* Quick Start Input */}
@@ -152,20 +196,22 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 </div>
               </button>
 
-              {/* Suggested Questions */}
+              {/* Demo Questions */}
               <div>
                 <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                  推荐问题：
+                  固定示例：
                 </h3>
                 <div className="flex flex-col gap-2">
-                  {suggestedQuestions.map((question, index) => (
+                  {demoQuestions.map((item, index) => (
                     <button
                       key={index}
-                      onClick={() => onNavigate("chat")}
+                      onClick={() => onAskQuestion?.(item.question)}
                       className="flex items-start gap-2 rounded-lg border border-border/50 bg-secondary/30 px-4 py-3 text-left text-sm text-foreground transition-all hover:border-primary/50 hover:bg-secondary"
                     >
-                      <span className="text-primary">•</span>
-                      <span className="line-clamp-2">{question}</span>
+                      <span className="shrink-0 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {item.label}
+                      </span>
+                      <span>{item.question}</span>
                     </button>
                   ))}
                 </div>
@@ -180,12 +226,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <div className="mx-auto max-w-3xl">
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary md:text-3xl">32</div>
-              <div className="text-xs text-muted-foreground md:text-sm">精选文献</div>
+              <div className="text-2xl font-bold text-primary md:text-3xl">
+                {documentCount ?? "—"}
+              </div>
+              <div className="text-xs text-muted-foreground md:text-sm">篇已解析文献</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary md:text-3xl">3秒</div>
-              <div className="text-xs text-muted-foreground md:text-sm">快速响应</div>
+              <div className="text-2xl font-bold text-primary md:text-3xl">秒级</div>
+              <div className="text-xs text-muted-foreground md:text-sm">响应速度</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-primary md:text-3xl">100%</div>
