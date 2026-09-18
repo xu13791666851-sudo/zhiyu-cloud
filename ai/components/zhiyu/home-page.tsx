@@ -1,14 +1,21 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Upload, MessageSquare, Link2, Search, BookOpen, ListChecks, ArrowRight, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { API_BASE_URL, apiRequest } from "@/lib/api"
 
 type TabType = "home" | "chat" | "documents"
 
 interface HomePageProps {
   onNavigate: (tab: TabType) => void
   onAskQuestion?: (question: string) => void
+}
+
+interface UploadedDocumentSummary {
+  status?: string
+  chunk_count?: number
 }
 
 const features = [
@@ -44,26 +51,49 @@ const features = [
   },
 ]
 
+// 示例问题按「文献库现有主题（夏昌世 / 岭南气候适应性建筑）」逐条实测过：
+// 都能命中正确的任务类型，并且检索得到的都是库里有直接依据的文献。
+// 换文献库时记得同步调整这 4 条，否则会出现「证据不足」。
 const demoQuestions = [
   {
     label: "文献摘要",
-    question: "这篇文献主要讲什么？请按研究问题、研究方法、核心结论和建筑学价值总结。",
+    question:
+      "请总结夏昌世与南方建筑降温研究的核心内容，按研究问题、研究方法、核心结论和建筑学价值四个方面展开。",
   },
   {
     label: "多文献对比",
-    question: "请对比两篇与城市更新相关的文献，整理它们的研究对象、研究方法和主要结论差异。",
+    question:
+      "请对比《亚热带城市性格的塑造》和《苏联专家与夏昌世对南方建筑降温研究的交集》两篇文献，整理它们的研究对象、研究方法和结论差异。",
   },
   {
     label: "相关研究",
-    question: "帮我找建筑学中关于社区公共空间更新的相关研究，并说明每篇文献和这个主题的关系。",
+    question:
+      "帮我找建筑学中关于夏昌世南方建筑降温与遮阳隔热设计的相关研究，并说明这些文献与主题的关系。",
   },
   {
     label: "引用综述",
-    question: "请写一段关于社区公共空间更新的文献综述，并在关键观点后附上引用来源。",
+    question:
+      "请写一段关于岭南湿热气候下被动式降温设计的文献综述，并在关键观点后附上引用来源。",
   },
 ]
 
 export default function HomePage({ onNavigate, onAskQuestion }: HomePageProps) {
+  // 指标区里的文献数直接读后端，不写死 —— 否则演示时数字和文献页对不上。
+  const [documentCount, setDocumentCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    apiRequest<{ documents?: UploadedDocumentSummary[] }>(`${API_BASE_URL}/api/documents`, {
+      cache: "no-store",
+    })
+      .then((data) => {
+        const ready = (data?.documents ?? []).filter(
+          (doc) => doc.status === "parsed" && (doc.chunk_count ?? 0) > 0,
+        )
+        setDocumentCount(ready.length)
+      })
+      .catch(() => setDocumentCount(null))
+  }, [])
+
   return (
     <div className="min-h-screen overflow-y-auto">
       {/* Hero Section */}
@@ -181,7 +211,7 @@ export default function HomePage({ onNavigate, onAskQuestion }: HomePageProps) {
                       <span className="shrink-0 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         {item.label}
                       </span>
-                      <span className="line-clamp-2">{item.question}</span>
+                      <span>{item.question}</span>
                     </button>
                   ))}
                 </div>
@@ -196,12 +226,14 @@ export default function HomePage({ onNavigate, onAskQuestion }: HomePageProps) {
         <div className="mx-auto max-w-3xl">
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary md:text-3xl">32</div>
-              <div className="text-xs text-muted-foreground md:text-sm">精选文献</div>
+              <div className="text-2xl font-bold text-primary md:text-3xl">
+                {documentCount ?? "—"}
+              </div>
+              <div className="text-xs text-muted-foreground md:text-sm">篇已解析文献</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary md:text-3xl">3秒</div>
-              <div className="text-xs text-muted-foreground md:text-sm">快速响应</div>
+              <div className="text-2xl font-bold text-primary md:text-3xl">秒级</div>
+              <div className="text-xs text-muted-foreground md:text-sm">响应速度</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-primary md:text-3xl">100%</div>

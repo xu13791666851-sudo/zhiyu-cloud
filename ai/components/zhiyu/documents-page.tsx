@@ -36,9 +36,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { API_BASE_URL, describeError, parseErrorResponse } from "@/lib/api"
 import { cn } from "@/lib/utils"
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 
 type DocumentStatus = "parsed" | "processing" | "pending" | "failed"
 
@@ -179,12 +178,7 @@ function splitInputList(value: string) {
 }
 
 async function parseError(response: Response) {
-  try {
-    const data = (await response.json()) as { detail?: string }
-    return data.detail || `Request failed with status ${response.status}`
-  } catch {
-    return `Request failed with status ${response.status}`
-  }
+  return parseErrorResponse(response)
 }
 
 function DocumentCard({
@@ -326,7 +320,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
       setDocuments(data.documents ?? [])
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载文档失败")
+      setError(describeError(err, "加载文档失败"))
     } finally {
       setIsLoading(false)
     }
@@ -410,7 +404,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
           const data = (await response.json()) as { document: ApiDocument }
           uploaded.push(data.document)
         } catch (err) {
-          failures.push(`${file.name}: ${err instanceof Error ? err.message : "上传失败"}`)
+          failures.push(`${file.name}: ${describeError(err, "上传失败")}`)
         }
       }
 
@@ -443,7 +437,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
         setPreviewDoc((prev) => (prev?.id === id ? null : prev))
         setError(null)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "删除文档失败")
+        setError(describeError(err, "删除文档失败"))
       } finally {
         setDeletingId(null)
       }
@@ -469,7 +463,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
       const data = (await response.json()) as { chunks?: ApiDocumentChunk[] }
       setPreviewChunks(data.chunks ?? [])
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : "加载解析片段失败")
+      setPreviewError(describeError(err, "加载解析片段失败"))
     } finally {
       setIsLoadingPreviewChunks(false)
     }
@@ -501,7 +495,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
         setDocuments((prev) => prev.map((item) => (item.id === data.document?.id ? data.document : item)))
       }
     } catch (err) {
-      setResearchCardError(err instanceof Error ? err.message : "加载文献卡片失败")
+      setResearchCardError(describeError(err, "加载文献卡片失败"))
     } finally {
       setIsLoadingResearchCard(false)
     }
@@ -529,7 +523,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
         }
         setPreviewMode("card")
       } catch (err) {
-        setResearchCardError(err instanceof Error ? err.message : "生成文献卡片失败")
+        setResearchCardError(describeError(err, "生成文献卡片失败"))
       } finally {
         setIsGeneratingResearchCard(false)
       }
@@ -574,7 +568,7 @@ export default function DocumentsPage({ onAskDocument }: { onAskDocument?: (docu
         setError(null)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存分类信息失败")
+      setError(describeError(err, "保存分类信息失败"))
     } finally {
       setIsSavingMetadata(false)
     }

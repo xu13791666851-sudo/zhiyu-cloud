@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { API_BASE_URL, apiRequest, errorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 interface Source {
@@ -142,7 +143,6 @@ const initialMessages: Message[] = [
   },
 ]
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 const ALL_DOCUMENTS_SCOPE = "all"
 
 function getDocumentDisplayName(document: ApiDocument) {
@@ -539,21 +539,21 @@ export default function ChatPage({
 
   useEffect(() => {
     setIsLoadingDocuments(true)
-    fetch(`${API_BASE_URL}/api/documents`, { cache: "no-store" })
-      .then((res) => res.json())
+    apiRequest<{ documents?: ApiDocument[] }>(`${API_BASE_URL}/api/documents`, {
+      cache: "no-store",
+    })
       .then((data) => {
         const parsedDocuments = ((data?.documents || []) as ApiDocument[]).filter(
           (document) => document.status === "parsed" && document.chunk_count > 0,
         )
         setDocuments(parsedDocuments)
       })
-      .catch((err) => console.error("Failed to load documents:", err))
+      .catch((err) => console.error("Failed to load documents:", errorMessage(err)))
       .finally(() => setIsLoadingDocuments(false))
   }, [])
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/history?session_id=${sessionId}`)
-      .then((res) => res.json())
+    apiRequest<any[]>(`${API_BASE_URL}/api/history?session_id=${sessionId}`)
       .then((data) => {
         if (data && data.length > 0) {
           const historyMessages: Message[] = data.map((entry: any) => ({
@@ -565,7 +565,7 @@ export default function ChatPage({
           setMessages((prev) => [...prev, ...historyMessages])
         }
       })
-      .catch((err) => console.error("Failed to load chat history:", err))
+      .catch((err) => console.error("Failed to load chat history:", errorMessage(err)))
   }, [sessionId])
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -583,7 +583,7 @@ export default function ChatPage({
     setIsLoading(true)
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/agent/research`, {
+      const data = await apiRequest<any>(`${API_BASE_URL}/api/agent/research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -593,10 +593,6 @@ export default function ChatPage({
           document_id: selectedDocumentId || undefined,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data?.detail || "Backend request failed")
-      }
 
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
@@ -608,13 +604,12 @@ export default function ChatPage({
 
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Backend request failed"
       setMessages((prev) => [
         ...prev,
         {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: `Warning: ${errorMessage}`,
+          content: `请求失败：${errorMessage(err)}`,
         },
       ])
     } finally {

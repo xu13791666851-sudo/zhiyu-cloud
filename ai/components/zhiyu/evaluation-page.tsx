@@ -14,8 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
+import { API_BASE_URL, apiRequest, describeError } from "@/lib/api"
 
 interface EvaluationSummary {
   total_questions: number
@@ -77,13 +76,11 @@ export default function EvaluationPage() {
   const loadEvaluation = () => {
     setIsLoading(true)
     setError(null)
-    fetch(`${API_BASE_URL}/api/agent/evaluation?limit=200`, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`请求失败：${res.status}`)
-        return res.json()
-      })
-      .then((payload: EvaluationResponse) => setData(payload))
-      .catch((err) => setError(err instanceof Error ? err.message : "评估数据加载失败"))
+    apiRequest<EvaluationResponse>(`${API_BASE_URL}/api/agent/evaluation?limit=200`, {
+      cache: "no-store",
+    })
+      .then((payload) => setData(payload))
+      .catch((err) => setError(describeError(err, "评估数据加载失败")))
       .finally(() => setIsLoading(false))
   }
 
